@@ -29,7 +29,7 @@ test('local alignment overrides skipped rows, snapshots source/crop options and 
  await expect(dialog.getByRole('button',{name:'开始对齐',exact:true})).toBeEnabled();
  for(const theme of ['light','dark']){await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;},theme);await page.screenshot({path:info.outputPath(`local-alignment-${theme}.png`)});}
  await dialog.getByRole('button',{name:'开始对齐',exact:true}).click();
- await expect.poll(()=>params).toMatchObject({scope_ids:['a','b'],audio_source:'original',crop_vocals:false});
+ await expect.poll(()=>params).toMatchObject({scope_ids:['a','b'],scope_envelope_ids:['selected'],audio_source:'original',crop_vocals:false});
  await expect.poll(async()=> (await(await page.request.get(url)).json()).document.lyrics.draftTtml).toContain('begin="00:00.600"');
  const saved=(await(await page.request.get(url)).json()).document.lyrics.draftTtml;expect(saved).toContain('begin="00:06.000"');
  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect.poll(async()=> (await(await page.request.get(url)).json()).document.lyrics.draftTtml).toContain('begin="00:00.500"');
@@ -49,7 +49,8 @@ test('selected timeline words share local alignment with canvas and timing optio
  const dialog=page.getByRole('dialog',{name:'局部对齐',exact:true});await expect(dialog).toBeVisible();
  const preview=page.waitForRequest(r=>r.url().includes('/alignment-preview?'));
  await dialog.getByRole('combobox',{name:'对齐模型',exact:true}).selectOption({label:'model · torchaudio-mms-fa'});
- expect(new URL((await preview).url()).searchParams.getAll('scope_ids')).toEqual(['a','b']);
+ const requestUrl=new URL((await preview).url());expect(requestUrl.searchParams.getAll('scope_ids')).toEqual(['a','b']);
+ expect(requestUrl.searchParams.getAll('scope_envelope_ids')).toEqual(['a','b']);
  await dialog.getByRole('button',{name:'取消',exact:true}).click();
  const canvas=page.locator('main [data-word-id="a"]').first();
  await canvas.dispatchEvent('contextmenu',{clientX:300,clientY:200});
@@ -82,8 +83,28 @@ test('local failure retries its selection and leaves the skipped global entry di
  await expect(dialog).toBeVisible();
  const preview=page.waitForRequest(r=>r.url().includes('/alignment-preview?'));
  await dialog.getByRole('combobox',{name:'对齐模型',exact:true}).selectOption({label:'model · torchaudio-mms-fa'});
- expect(new URL((await preview).url()).searchParams.getAll('scope_ids')).toEqual(['a','b']);
+ const requestUrl=new URL((await preview).url());expect(requestUrl.searchParams.getAll('scope_ids')).toEqual(['a','b']);
+ expect(requestUrl.searchParams.getAll('scope_envelope_ids')).toEqual(['selected']);
  await dialog.getByRole('button',{name:'取消',exact:true}).click();
  await page.getByRole('button',{name:'音频处理',exact:true}).click();
  await expect(page.getByRole('button',{name:'自动对齐',exact:true})).toBeDisabled();
+});
+
+
+test('row-only timing opens local alignment and previews its row envelope',async({page})=>{
+ const url='/api/v1/projects/music-packaging/document';
+ const before=await(await page.request.get(url)).json();
+ before.document.lyrics.draftTtml=before.document.lyrics.draftTtml.replace(/(<span[^>]*studio:id="[ab]")[^>]*>/g,'$1 studio:null="begin end">');
+ expect((await page.request.put(url,{headers:{origin:'http://127.0.0.1:5175','if-match':before.revision},data:before})).ok()).toBeTruthy();
+ await page.route('**/api/v1/capabilities',route=>route.fulfill({json:{schema_version:'studio-capabilities-v1',items:[{id:'job.alignment',enabled:true,reason:null}]}}));
+ await page.goto('/projects/music-packaging/edit');
+ await page.locator('[data-outline-drag]').first().click({button:'right'});
+ await expect(page.getByRole('menuitem',{name:'局部对齐',exact:true})).toBeEnabled();
+ await page.getByRole('menuitem',{name:'局部对齐',exact:true}).click();
+ const dialog=page.getByRole('dialog',{name:'局部对齐',exact:true});
+ const response=page.waitForResponse(r=>r.url().includes('/alignment-preview?'));
+ await dialog.getByRole('combobox',{name:'对齐模型',exact:true}).selectOption({label:'model · torchaudio-mms-fa'});
+ const preview=await response;expect(preview.ok()).toBeTruthy();
+ expect(new URL(preview.url()).searchParams.getAll('scope_envelope_ids')).toEqual(['selected']);
+ await expect(dialog.getByRole('button',{name:'开始对齐',exact:true})).toBeEnabled();
 });

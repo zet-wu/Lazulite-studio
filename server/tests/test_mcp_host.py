@@ -166,8 +166,19 @@ def test_mcp_process_lifecycle_proxy_security_and_clean_stop(tmp_path):
             else:
                 payload = tools_resp.json()
             names = [t["name"] for t in payload["result"]["tools"]]
-            assert len(names) == 36
+            assert len(names) == 40
             assert "apply_alignment_result" in names
+            assert 'inspect_alignment_anomalies' in names and 'edit_karaoke_cues' in names
+            assert 'lazulite://guides/alignment-and-segmentation' in _parse_mcp_json(init_resp)['result']['instructions']
+            for rpc_id, method, params, expected in [
+                (3, 'prompts/list', {}, 'full_lyric_workflow'),
+                (4, 'prompts/get', {'name':'refine_alignment_anomalies','arguments':{'project_id':'p','mode':'balanced'}}, 'scope_line_ids'),
+                (5, 'resources/list', {}, 'lazulite://guides/alignment-and-segmentation'),
+                (6, 'resources/read', {'uri':'lazulite://guides/alignment-and-segmentation'}, 'M8'),
+            ]:
+                reply = client.post('/mcp', json={'jsonrpc':'2.0','id':rpc_id,'method':method,'params':params}, headers={'mcp-session-id':session_id,'Content-Type':'application/json','Accept':'application/json, text/event-stream'})
+                assert reply.status_code == 200
+                assert expected in json.dumps(_parse_mcp_json(reply)['result'])
     finally:
         handle.stop()
 
@@ -280,7 +291,7 @@ def test_real_fastapi_lyric_editing_and_alignment_via_mcp(tmp_path, monkeypatch)
 
             req_id = 1
 
-            def call_tool(name: str, arguments: dict, *, raw=False) -> dict:
+            def call_tool(name: str, arguments: dict, *, raw=False, error_status=None) -> dict:
                 nonlocal req_id
                 req_id += 1
                 resp = _mcp_post(
@@ -291,6 +302,11 @@ def test_real_fastapi_lyric_editing_and_alignment_via_mcp(tmp_path, monkeypatch)
                 )
                 assert resp.status_code == 200
                 body = _parse_mcp_json(resp)["result"]
+                if error_status is not None:
+                    assert body.get('isError'), body
+                    error = json.loads(body['content'][0]['text'])
+                    assert error['details']['status'] == error_status, error
+                    return error
                 assert not body.get("isError"), f"{name} failed: {body}"
                 return body if raw else json.loads(body["content"][0]["text"])
 
@@ -415,7 +431,7 @@ def test_real_fastapi_lyric_editing_and_alignment_via_mcp(tmp_path, monkeypatch)
             assert len(ttml['content']) == 2
             assert json.loads(ttml['content'][0]['text'])['partial']
             assert 'studio:id' in ttml['content'][1]['text']
-            vocal_job = call_tool('start_vocal_separation', {'project_id':'p','force_separation':True,'idempotency_key':'listen-vocal'})
+            vocal_job = call_tool('start_vocal_separation', {'project_id':'p','model_id':'demucs','force_separation':True,'idempotency_key':'listen-vocal'})
             for _ in range(200):
                 vocal_status = call_tool('get_job_status', {'job_id':vocal_job['job_id']})
                 if vocal_status['status'] == 'succeeded': break
@@ -431,6 +447,51 @@ def test_real_fastapi_lyric_editing_and_alignment_via_mcp(tmp_path, monkeypatch)
             with wave.open(io.BytesIO(base64.b64decode(excerpt['content'][1]['data']))) as wav:
                 assert (wav.getframerate(),wav.getnchannels(),wav.getsampwidth()) == (16000,1,2)
             assert call_tool('list_jobs', {'project_id':'p','kind':'alignment'})['items'][0]['acknowledged_state'] == 'applied'
+
+            # Shared acoustic CAS path adopts the new result and rejects foreign bindings.
+            ready = next(item for item in call_tool('list_vocal_results', {'project_id':'p','detail':'full'})['items'] if item['id'] == vocal_result['id'])
+            segments = [{'id':item['id'],'begin_ms':item['beginMs'],'end_ms':item['endMs']} for item in ready['segments']]
+            adopted = call_tool('edit_acoustics', {'project_id':'p','analysis_id':ready['id'],'operations':[{'op':'replace_segments','segments':segments}]})
+            assert adopted['changed']
+            assert call_tool('get_acoustics', {'project_id':'p'})['analysis_id'] == ready['id']
+            call_tool('edit_acoustics', {'project_id':'p','analysis_id':'foreign','operations':[{'op':'replace_segments','segments':segments}]}, error_status=422)
+            call_tool('edit_acoustics', {'project_id':'p','expected_revision':'stale','operations':[{'op':'replace_segments','segments':[]}]}, error_status=412)
+            assert call_tool('get_acoustics', {'project_id':'p'})['revision'] == adopted['new_revision']
+
+            # Cue CRUD and atomic rollback pass through the real Python document boundary.
+            guides = call_tool('get_karaoke_cues', {'project_id':'p','line_ids':[right],'include_available_gaps':True})
+            anchor = next(gap['anchor'] for gap in guides['available_gaps'] if gap['anchor']['kind'] == 'before')
+            created = call_tool('edit_karaoke_cues', {'project_id':'p','expected_revision':guides['revision'],'operations':[
+                {'op':'insert_cue','anchor':anchor,'begin_ms':0,'end_ms':50,'client_ref':'intro'},
+                {'op':'update_cue','cue_id':'intro','text':'go'}]})
+            cue_id = created['created_refs']['intro']
+            assert call_tool('get_karaoke_cues', {'project_id':'p','line_ids':[right]})['cues'][0]['text'] == 'go'
+            call_tool('edit_karaoke_cues', {'project_id':'p','operations':[{'op':'delete_cue','cue_id':cue_id},{'op':'delete_cue','cue_id':'missing'}]}, error_status=422)
+            assert call_tool('get_karaoke_cues', {'project_id':'p'})['revision'] == created['new_revision']
+            call_tool('edit_karaoke_cues', {'project_id':'p','operations':[{'op':'delete_cue','cue_id':cue_id}]})
+
+            # A row timed before its leaves can preview and launch a local selection.
+            local_import = call_tool('import_lyrics', {'project_id':'p','format':'txt','content':'あい','mode':'replace_all'})
+            call_tool('segment_lyrics', {'project_id':'p','target':'words','scope':{'all':True},'options':{'japanese_mora':True},'dry_run':False})
+            view = call_tool('get_lyrics', {'project_id':'p'})
+            local_line = view['lines'][0]['line_id']; local_words = view['lines'][0]['words']
+            call_tool('edit_timing', {'project_id':'p','operations':[{'op':'set_line_time','line_id':local_line,'begin_ms':0,'end_ms':1500}]})
+            diagnostics = call_tool('inspect_alignment_anomalies', {'project_id':'p'})
+            assert diagnostics['anomaly_count'] == 1 and diagnostics['anomalies'][0]['reasons'] == ['missing_timing']
+            local = call_tool('preview_alignment', {'project_id':'p','model_id':model_id,'scope_line_ids':[local_line]})
+            assert local['scope_ids'] == [word['word_id'] for word in local_words]
+            assert local['scope_envelope_ids'] == [local_line]
+            job = call_tool('start_alignment', {'project_id':'p','model_preview':local['model_preview'],'revision':local['revision'],'scope_line_ids':[local_line],'smart_extend':True})
+            for _ in range(100):
+                state = call_tool('get_job_status', {'job_id':job['job_id']})
+                if state['status'] == 'succeeded': break
+                assert state['status'] in ('queued','running'), state
+                time.sleep(.05)
+            else: raise AssertionError('Local alignment fixture did not finish')
+            call_tool('apply_alignment_result', {'job_id':job['job_id']})
+            cleared = call_tool('edit_timing', {'project_id':'p','operations':[{'op':'clear_line_timing','line_id':local_line}]})
+            assert cleared['changed']
+            assert call_tool('get_lyrics', {'project_id':'p'})['lines'][0]['words'][0]['begin_ms'] is None
 
             stop_sse.set()
             sse_thread.join(timeout=2.0)

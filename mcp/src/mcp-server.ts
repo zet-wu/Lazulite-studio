@@ -1,3 +1,4 @@
+import { WORKFLOW_INSTRUCTIONS, registerGuidance } from './guidance';
 import { registerKaraokeTools } from './tools/karaoke';
 import { registerAudioJobTools } from './tools/audio-jobs';
 import { registerTransformTools } from './tools/transforms';
@@ -35,7 +36,8 @@ export function createMcpServer(client: StudioClient, registry: ToolRegistry = c
   const server = new McpServer({
     name: 'lazulite-studio',
     version: '0.1.0',
-  });
+  }, {instructions:WORKFLOW_INSTRUCTIONS});
+  registerGuidance(server);
 
   for (const tool of registry.list()) {
     server.registerTool(

@@ -43,7 +43,7 @@ function batchAffectedLines(before: ProjectDocument, after: ProjectDocument): st
 }
 
 export function registerTransformTools(registry: ToolRegistry) {
-  registry.register({ name: 'segment_lyrics', description: 'Preview/apply shared desktop word segmentation or ruby mora splits. dry_run defaults to true. Existing ruby words are skipped by default while other body words continue; skip_existing_ruby=false reports them as blocked, allow_overwrite_ruby=true explicitly replaces them. Scope is explicit; summary omits per-word previews.', annotations,
+  registry.register({ name: 'segment_lyrics', description: 'Preview/apply shared desktop body-word segmentation or ruby mora splits. Default workflow: body first, then readings, then ruby mora. Japanese kana/okurigana must split from kanji (split_cjk=true,japanese_mora=true); Chinese body uses single characters; Western text uses western=word. Splitting ruby alone does not split body. dry_run defaults to true. Existing ruby words are skipped by default while other body words continue; skip_existing_ruby=false reports them as blocked, allow_overwrite_ruby=true explicitly replaces them. Scope is explicit; summary omits per-word previews.', annotations,
     inputSchema: { ...transformSchema(), target: z.enum(['words','ruby']), scope: scopeSchema(), options: optionsSchema().default({}), allow_overwrite_ruby: z.boolean().default(false), skip_existing_ruby: z.boolean().default(true), detail: z.enum(['summary','full']).default('full') },
     execute: async (args, { client }) => mutateProjectDocument(client, args.project_id, { expectedRevision: args.expected_revision, idempotencyKey: args.idempotency_key, dryRun: args.dry_run }, async (doc, envelope) => {
       const options: SegmentOptions = {

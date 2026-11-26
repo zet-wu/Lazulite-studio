@@ -1,3 +1,4 @@
+import { displayLines } from '../../../frontend/src/domain/amll-compatibility';
 import { parseProject } from '../../../frontend/src/adapters/project-codec';
 import { toRomaji } from 'wanakana';
 import { lineText } from '../../../frontend/src/domain/lyric-document';
@@ -49,7 +50,8 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
     execute:async(args,{client})=>{
       const envelope=await client.getDocumentEnvelope(args.project_id),doc=parseProject(envelope.document);
       args.line_ids?.forEach(id=>requireLine(doc,id));
-      const lines=doc.lyrics.lines.filter(line=>args.line_ids ? args.line_ids.includes(line.id) : !doc.editing.skippedAlignmentLineIds.includes(line.id));
+      const ordered=displayLines(doc.lyrics,doc.lineOrder);
+      const lines=ordered.filter(line=>args.line_ids ? args.line_ids.includes(line.id) : !doc.editing.skippedAlignmentLineIds.includes(line.id));
       const anomalies=lines.flatMap(line=>{
         const leaves=line.words.flatMap<{id:string;text:string;beginMs:number|null;endMs:number|null}>(word=>word.rubyUnits.length ? word.rubyUnits.filter(u=>u.reading.trim()).map(u=>({...u,text:u.reading})) : word.text.trim() ? [word] : []);
         const reasons=new Set<string>(),flags=new Map<string, {unit_id:string;text:string;begin_ms:number|null;end_ms:number|null;duration_ms:number|null;reasons:string[]}>();
@@ -75,7 +77,7 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
         }
         const scope=localAlignmentTargets(doc.lyrics,'lines',[line.id]);
         if(!reasons.size)return [];
-        return [{line_id:line.id,line_number:doc.lyrics.lines.indexOf(line)+1,text:lineText(line),reasons:[...reasons],line_envelope_ms:[scope.beginMs,scope.endMs],flagged_units:[...flags.values()]}];
+        return [{line_id:line.id,line_number:ordered.indexOf(line)+1,text:lineText(line),reasons:[...reasons],line_envelope_ms:[scope.beginMs,scope.endMs],flagged_units:[...flags.values()]}];
       });
       return {revision:envelope.revision,scanned_lines:lines.length,anomaly_count:anomalies.length,anomalies};
     },
@@ -111,7 +113,7 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
   registry.register({
     name: 'preview_alignment',
     description:
-      'Preview forced-alignment input for the current saved document revision (or specified revision), returning alignable lines, unknown token warnings, and a model_preview token for start_alignment.',
+      'Preview forced-alignment input for the current saved document revision (or specified revision), returning alignable lines, unknown token warnings, and a model_preview token for start_alignment. scope_line_ids/scope_word_ids resolve local reading leaves and parent union envelopes without padding; mutually exclusive with scope_ids. After NextFire use anomaly diagnosis + acoustics, then a different MMS_FA model with smart_extend=true, never same-model local retry.',
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     inputSchema: {
       project_id: z.string().min(1).describe('Target project ID.'),
@@ -160,7 +162,7 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
   registry.register({
     name: 'start_alignment',
     description:
-      'Submit an asynchronous forced-alignment job on the saved project revision and return job_id immediately (auto-chains vocal separation if missing). Returns retryable busy guidance when the project queue slot is occupied.',
+      'Submit an asynchronous forced-alignment job on the saved project revision and return job_id immediately (auto-chains vocal separation if missing). Returns retryable busy guidance when the project queue slot is occupied. Use matching preview scope/options/revision. scope_line_ids/scope_word_ids are local shortcuts; scope_ids is the direct leaf path. Keep vocals/crop enabled and blank/rest heuristics off. For Japanese NextFire anomalies switch to MMS_FA+smart_extend=true after acoustic review; never retry locally with the same model.',
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     inputSchema: {
       project_id: z.string().min(1).describe('Target project ID.'),

@@ -42,7 +42,7 @@ export function registerAudioJobTools(registry: ToolRegistry) {
       }) };
     },
   });
-  registry.register({ name: 'start_vocal_separation', description: 'Start independent vocal separation using optional model_id (demucs or bs-karaoke), otherwise the desktop preference. Explicit model selection only reuses results from the same model. Reuses existing audio unless force_separation=true. Returns a background job immediately; a busy queue is retryable.', annotations: write,
+  registry.register({ name: 'start_vocal_separation', description: 'Start independent vocal separation using optional model_id (demucs or bs-karaoke), otherwise the desktop preference. Explicit model selection only reuses results from the same model. Reuses existing audio unless force_separation=true. Use demucs for speed or ready bs-karaoke for strong lead/backing overlap. Returns a background job immediately; poll status, then list_vocal_results(detail=full) and edit_acoustics(analysis_id,replace_segments) to select it before alignment. A busy queue is retryable.', annotations: write,
     inputSchema: { project_id: id(), force_separation: z.boolean().default(false), model_id: z.enum(['demucs','bs-karaoke']).optional(), idempotency_key: id().optional() },
     execute: async ({ project_id, force_separation, model_id, idempotency_key }, { client }) => {
       const project = await client.getProject(project_id); if (!project.asset) invalid('Upload source audio before separating vocals.');
@@ -92,6 +92,7 @@ export function registerAudioJobTools(registry: ToolRegistry) {
       const project=await client.getProject(args.project_id),duration=project.asset?.source_duration_ms??project.asset?.duration_ms;
       if(duration===undefined||duration===null)invalid('Source audio duration is required to edit acoustic segments.');
       return mutateProjectDocument(client,args.project_id,{expectedRevision:args.expected_revision,idempotencyKey:args.idempotency_key},(doc,envelope)=>{
+        if(envelope.source_asset_id!==project.asset!.id) throw new StudioHttpError(409,{code:'source_asset_changed',message:'Source audio changed while reading its duration; reload before editing acoustic segments.',retryable:false});
         let segments=doc.acoustics.segments.map(segment=>({...segment}));const refs:Record<string,string>=Object.create(null);
         args.operations.forEach((op,index)=>withOperationContext(op,index,envelope.revision,()=>{
           if(op.op==='replace_segments')segments=op.segments.map(segment=>({id:segment.id??crypto.randomUUID(),beginMs:segment.begin_ms,endMs:segment.end_ms}));

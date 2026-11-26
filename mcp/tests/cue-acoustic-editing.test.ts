@@ -6,7 +6,7 @@ import { projectFixture } from './project-fixture';
 
 function fixture(){
  const doc=createProjectDocument();doc.lyrics.lines=[{...createLine('','l'),beginMs:2000,endMs:4000,words:[{...createWord('愛','w1'),beginMs:2000,endMs:3000,rubyUnits:[{id:'r1',reading:'あ',beginMs:2000,endMs:2500},{id:'r2',reading:'い',beginMs:2500,endMs:3000}]},{...createWord('う','w2'),beginMs:3500,endMs:4000}]}];
- return projectFixture(doc,()=>Response.json({asset:{id:'audio',source_duration_ms:5000}}));
+ return projectFixture(doc,()=>Response.json({asset:{id:'audio',source_duration_ms:5000}}),'audio');
 }
 it('deletes one ruby and clears word/line descendants with parent envelope policies',async()=>{
  const f=fixture(),r=createToolRegistry();
@@ -42,4 +42,10 @@ it('roundtrips cues with explicit times, refs, gaps, paging, updates and deletes
  await expect(r.call('edit_karaoke_cues',{project_id:'p',expected_revision:'stale',operations:[{op:'remove_line_cues',line_ids:['l']}]},f)).rejects.toMatchObject({status:412});
  await r.call('edit_karaoke_cues',{project_id:'p',operations:[{op:'remove_line_cues',line_ids:['l']},{op:'auto_insert_cues',group_ids:['main'],thresholds:{before_ms:500,word_ms:100,ruby_ms:100}}]},f);
  expect(f.doc().karaoke.cues).toHaveLength(2);
+});
+
+it('rejects an audio replacement between duration lookup and acoustic document read',async()=>{
+ const f=projectFixture(createProjectDocument(),()=>Response.json({asset:{id:'previous-audio',source_duration_ms:5000}}),'new-audio');
+ await expect(createToolRegistry().call('edit_acoustics',{project_id:'p',operations:[{op:'replace_segments',segments:[{begin_ms:0,end_ms:4000}]}]},f)).rejects.toMatchObject({status:409,body:{code:'source_asset_changed'}});
+ expect(f.writes()).toBe(0);
 });

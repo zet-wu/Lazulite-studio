@@ -27,11 +27,12 @@ it('resolves line/word scopes into reading IDs and union envelope IDs for previe
 });
 it('diagnoses short units, exact boundary vowels and missing timing in both M8 modes',async()=>{
  const doc=fixture();doc.lyrics.lines.push({...createLine('','same'),words:[{...createWord('か','a'),beginMs:100,endMs:160},{...createWord('あ','b'),beginMs:160,endMs:500}]});
- doc.lyrics.lines.push({...createLine('え','missing')});doc.lyrics.lines.push(createLine('う','skip'));doc.editing.skippedAlignmentLineIds=['skip'];
+ doc.lyrics.lines.push({...createLine('え','missing')});doc.lyrics.lines.push(createLine('う','skip'));doc.editing.skippedAlignmentLineIds=['skip'];doc.lineOrder=['same','l','missing','skip'];
  const f=projectFixture(doc),registry=createToolRegistry();
  const args={project_id:'p'};
- const balanced=await registry.call('inspect_alignment_anomalies',args,f) as {anomalies:{line_id:string;reasons:string[]}[]};
+ const balanced=await registry.call('inspect_alignment_anomalies',args,f) as {anomalies:{line_id:string;line_number:number;reasons:string[]}[]};
  expect(balanced).toMatchObject({scanned_lines:3,anomaly_count:3});
+ expect(balanced.anomalies.find(a=>a.line_id==='l')).toMatchObject({line_number:2});
  expect(balanced.anomalies.find(a=>a.line_id==='l')?.reasons).toContain('short_unit');
  expect(balanced.anomalies.find(a=>a.line_id==='same')?.reasons).toContain('same_vowel_imbalance');
  const conservative=await registry.call('inspect_alignment_anomalies',{...args,mode:'conservative'},f) as typeof balanced;

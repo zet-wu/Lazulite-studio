@@ -15,7 +15,7 @@ const operation = z.discriminatedUnion('op', [
   z.object({ op: z.literal('set_empty_beat'), target_kind: z.enum(['word','ruby']), target_id: id(), count: z.number().int().min(0).max(32) }),
 ]);
 export function registerTimingTools(registry: ToolRegistry) {
-  registry.register({ name: 'edit_timing', description: 'Atomically edit nullable lyric timing endpoints and empty beats. Omitted endpoints remain unchanged. Word/ruby edits recompute parent envelopes by default using the same domain commands as the desktop editor.', annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+  registry.register({ name: 'edit_timing', description: 'Atomically edit nullable lyric timing endpoints and empty beats. Omitted endpoints remain unchanged. set_*_time with begin_ms=null,end_ms=null clears that object; clear_line_timing/clear_word_timing atomically clear it and descendant words/ruby. Adjust set_line_time after acoustic review to control a safe local alignment envelope; the server adds no padding. Word/ruby edits recompute parent envelopes by default using the same domain commands as the desktop editor.', annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     inputSchema: { ...writeSchema(), recompute_envelopes: z.boolean().default(true), operations: z.array(operation).min(1) },
     execute: async (args, { client }) => mutateProjectDocument(client, args.project_id, { expectedRevision: args.expected_revision, idempotencyKey: args.idempotency_key }, (doc, envelope) => {
       let next = doc; const affected = new Set<string>();

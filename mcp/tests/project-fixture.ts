@@ -6,7 +6,7 @@ import { StudioClient } from '../src/client';
 import { installXmlDomShim } from '../src/xml-shim';
 installXmlDomShim();
 
-export function projectFixture(doc: ProjectDocument, extra?: (url: URL, init?: RequestInit) => Response | Promise<Response>) {
+export function projectFixture(doc: ProjectDocument, extra?: (url: URL, init?: RequestInit) => Response | Promise<Response>, sourceAssetId: string | null = null) {
   doc.karaoke = createKaraoke(doc.lyrics);
   let snapshot = serializeProject(doc), revision = 'r1', writes = 0;
   const client = new StudioClient({ baseUrl: 'http://localhost:15173', fetchImpl: async (input, init) => {
@@ -17,7 +17,7 @@ export function projectFixture(doc: ProjectDocument, extra?: (url: URL, init?: R
         snapshot = JSON.parse(String(init.body)).document; revision = `r${++writes + 1}`;
         return Response.json({ revision });
       }
-      return Response.json({ project_id: 'p', revision, document: snapshot, source_asset_id: null });
+      return Response.json({ project_id: 'p', revision, document: snapshot, source_asset_id: sourceAssetId });
     }
     if (extra) return extra(url, init);
     throw new Error(`Unexpected request ${url}`);
