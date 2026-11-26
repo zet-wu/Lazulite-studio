@@ -22,23 +22,43 @@ function toolError(status: number, code: string, message: string, extra: Partial
   });
 }
 
+const continuousWindow = 'A local alignment uses one continuous [min, max] audio window. Split discontiguous targets into independent tasks; preview, submit and apply each in turn.';
 const scopeSchema = () => ({
-  scope_ids: z.array(id()).min(2).optional().describe('Reading leaf IDs; mutually exclusive with scope_line_ids and scope_word_ids.'),
-  scope_line_ids: z.array(id()).min(1).optional().describe('Local row selection; includes row/word/ruby union envelope without padding.'),
-  scope_word_ids: z.array(id()).min(1).optional().describe('Local word selection; includes word/ruby union envelope without padding.'),
+  scope_ids: z.array(id()).min(2).optional().describe(`Reading leaf IDs; mutually exclusive with scope_line_ids and scope_word_ids. ${continuousWindow}`),
+  scope_line_ids: z.array(id()).min(1).optional().describe(`Single or consecutive adjacent rows, using row/word/ruby union envelope without padding. ${continuousWindow}`),
+  scope_word_ids: z.array(id()).min(1).optional().describe(`Adjacent words, using word/ruby union envelope without padding. ${continuousWindow}`),
 });
 async function resolveScope(client: import('../client').StudioClient, projectId: string, revision: string, args: {scope_ids?:string[];scope_line_ids?:string[];scope_word_ids?:string[]}) {
   if ([args.scope_ids,args.scope_line_ids,args.scope_word_ids].filter(value => value !== undefined).length > 1) invalid('scope_ids, scope_line_ids and scope_word_ids are mutually exclusive.');
-  const ids = args.scope_line_ids ?? args.scope_word_ids;
-  if (!ids) return {scope_ids:args.scope_ids ?? null,scope_envelope_ids:null};
+  const ids = args.scope_line_ids ?? args.scope_word_ids ?? args.scope_ids;
+  if (!ids) return { options: {scope_ids:null,scope_envelope_ids:null}, envelope_ms: null, warnings: [] as string[] };
   const envelope = await client.getDocumentEnvelope(projectId);
   if (envelope.revision !== revision) throw toolError(412,'revision_conflict','Selection revision changed; read and preview again.');
-  const doc = parseProject(envelope.document), kind = args.scope_line_ids ? 'lines' : 'words';
-  if (new Set(ids).size !== ids.length || ids.some(id => kind === 'lines' ? !doc.lyrics.lines.some(line => line.id === id) : !doc.lyrics.lines.some(line => line.words.some(word => word.id === id)))) invalid('Selection contains duplicate or unknown line/word IDs.');
-  const scope = localAlignmentTargets(doc.lyrics,kind,ids);
+  const doc = parseProject(envelope.document);
+  const ordered = displayLines(doc.lyrics, doc.lineOrder);
+  const words = ordered.flatMap((line, index) => line.words.map(word => ({word, lineNumber:index + 1})));
+  const leaves = words.flatMap<{id:string;beginMs:number|null;endMs:number|null}>(({word}) => word.rubyUnits.length ? word.rubyUnits : [word]);
+  const kind = args.scope_line_ids ? 'lines' : 'words';
+  const known = args.scope_ids ? leaves : kind === 'lines' ? ordered : words.map(item => item.word);
+  if (new Set(ids).size !== ids.length || ids.some(id => !known.some(item => item.id === id))) invalid('Selection contains duplicate or unknown IDs.');
+  const scope = args.scope_ids ? (() => {
+    const selected = leaves.filter(unit => ids.includes(unit.id));
+    const begins = selected.flatMap(unit => unit.beginMs === null ? [] : [unit.beginMs]);
+    const ends = selected.flatMap(unit => unit.endMs === null ? [] : [unit.endMs]);
+    return {ids, envelopeIds:null, beginMs:begins.length ? Math.min(...begins) : null, endMs:ends.length ? Math.max(...ends) : null};
+  })() : localAlignmentTargets(doc.lyrics,kind,ids);
   if (scope.ids.length < 2) invalid('Local alignment requires at least two reading leaves.');
   if (scope.beginMs === null || scope.endMs === null || scope.beginMs >= scope.endMs) invalid('Selected units have no valid time envelope; set row/word timing first.');
-  return {scope_ids:scope.ids,scope_envelope_ids:scope.envelopeIds};
+  const warnings: string[] = [];
+  const pronounceable = (word: typeof words[number]['word']) => /[\p{L}\p{N}]/u.test(word.rubyUnits.length ? word.rubyUnits.map(unit => unit.reading).join('') : word.text);
+  if (!args.scope_ids) {
+    const items = kind === 'lines' ? ordered.map((line,index) => ({id:line.id,lineNumber:index+1,speaks:line.words.some(pronounceable)}))
+      : words.map(({word,lineNumber}) => ({id:word.id,lineNumber,speaks:pronounceable(word)}));
+    const indices = items.flatMap((item,index) => ids.includes(item.id) ? [index] : []);
+    const skipped = items.slice(Math.min(...indices), Math.max(...indices)+1).filter(item => !ids.includes(item.id) && item.speaks);
+    if (skipped.length) warnings.push(`Discontiguous range covers ${skipped.length} unselected pronounceable ${kind} in display lines ${skipped[0].lineNumber}–${skipped.at(-1)!.lineNumber}. The continuous audio envelope includes unrelated audio; split into independent local alignment tasks.`);
+  }
+  return {options:{scope_ids:scope.ids,scope_envelope_ids:scope.envelopeIds},envelope_ms:[scope.beginMs,scope.endMs],warnings};
 }
 
 export function registerAlignmentTools(registry: ToolRegistry): void {
@@ -113,7 +133,7 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
   registry.register({
     name: 'preview_alignment',
     description:
-      'Preview forced-alignment input for the current saved document revision (or specified revision), returning alignable lines, unknown token warnings, and a model_preview token for start_alignment. scope_line_ids/scope_word_ids resolve local reading leaves and parent union envelopes without padding; mutually exclusive with scope_ids. After NextFire use anomaly diagnosis + acoustics, then a different MMS_FA model with smart_extend=true, never same-model local retry.',
+      'Preview forced-alignment input for the current saved document revision (or specified revision), returning alignable lines, unknown token warnings, and a model_preview token for start_alignment. Local preview returns envelope_ms and optional discontiguous warnings. A local task uses one continuous [min, max] window; split discontiguous targets into independent tasks, preview/submit/apply each. scope_line_ids/scope_word_ids resolve local reading leaves and parent union envelopes without padding; mutually exclusive with scope_ids. After NextFire use anomaly diagnosis + acoustics, then a different MMS_FA model with smart_extend=true, never same-model local retry.',
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     inputSchema: {
       project_id: z.string().min(1).describe('Target project ID.'),
@@ -135,7 +155,7 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
       { client },
     ) => {
       const targetRevision = revision ?? (await client.getDocumentEnvelope(project_id)).revision;
-      const scope = await resolveScope(client,project_id,targetRevision,selection);
+      const { options: scope, envelope_ms, warnings } = await resolveScope(client,project_id,targetRevision,selection);
       const summary = await client.previewAlignment(project_id, targetRevision, model_id, {
         convert_particles,
         latin_normalize,
@@ -153,6 +173,7 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
       }
       const issues = inputs.filter(input => input.problem || input.unknown_characters?.length);
       return { project_id, revision: targetRevision, model_id, ...scope, ...counts,
+        ...(scope.scope_ids ? {envelope_ms, ...(warnings.length ? {warnings} : {})} : {}),
         ...(detail === 'summary' ? { issues: issues.map(({ object_id, problem, unknown_characters }) => ({ object_id, problem, unknown_characters })) }
           : { inputs: (detail === 'full' ? inputs : issues).filter(input => !allowed || allowed.has(input.object_id)) }),
       };
@@ -162,7 +183,7 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
   registry.register({
     name: 'start_alignment',
     description:
-      'Submit an asynchronous forced-alignment job on the saved project revision and return job_id immediately (auto-chains vocal separation if missing). Returns retryable busy guidance when the project queue slot is occupied. Use matching preview scope/options/revision. scope_line_ids/scope_word_ids are local shortcuts; scope_ids is the direct leaf path. Keep vocals/crop enabled and blank/rest heuristics off. For Japanese NextFire anomalies switch to MMS_FA+smart_extend=true after acoustic review; never retry locally with the same model.',
+      'Submit an asynchronous forced-alignment job on the saved project revision and return job_id immediately (auto-chains vocal separation if missing). Returns retryable busy guidance when the project queue slot is occupied. Use matching preview scope/options/revision. A local task uses one continuous [min, max] audio window; split discontiguous targets into independent tasks, preview/submit/apply each. scope_line_ids/scope_word_ids are local shortcuts; scope_ids is the direct leaf path. Keep vocals/crop enabled and blank/rest heuristics off. For Japanese NextFire anomalies switch to MMS_FA+smart_extend=true after acoustic review; never retry locally with the same model.',
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     inputSchema: {
       project_id: z.string().min(1).describe('Target project ID.'),
@@ -199,7 +220,7 @@ export function registerAlignmentTools(registry: ToolRegistry): void {
     },
     execute: async (args, { client }) => {
       const targetRevision = args.revision ?? (await client.getDocumentEnvelope(args.project_id)).revision;
-      const scope = await resolveScope(client,args.project_id,targetRevision,args);
+      const { options: scope } = await resolveScope(client,args.project_id,targetRevision,args);
       let modelPreview = args.model_preview;
       if (!modelPreview) {
         if (!args.model_id) {

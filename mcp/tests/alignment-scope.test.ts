@@ -14,7 +14,7 @@ it('resolves line/word scopes into reading IDs and union envelope IDs for previe
  const f=projectFixture(fixture(),(url,init)=>{calls.push({url,init});return Response.json(url.pathname.endsWith('/jobs')?{items:[]}:url.pathname.endsWith('/alignment-preview')?{model_preview:'token',emitting_count:2}:{id:'j',project_id:'p',kind:'alignment',status:'queued'});}),registry=createToolRegistry();
  for(const kind of ['line','word']){
   const scope=kind==='line'?{scope_line_ids:['l']}:{scope_word_ids:['w']};
-  expect(await registry.call('preview_alignment',{project_id:'p',model_id:'m',...scope},f)).toMatchObject({scope_ids:['r1','r2'],scope_envelope_ids:[kind==='line'?'l':'w']});
+  expect(await registry.call('preview_alignment',{project_id:'p',model_id:'m',...scope},f)).toMatchObject({scope_ids:['r1','r2'],scope_envelope_ids:[kind==='line'?'l':'w'],envelope_ms:kind==='line'?[100,2000]:[200,1800]});
   expect(calls.at(-1)!.url.searchParams.getAll('scope_envelope_ids')).toEqual([kind==='line'?'l':'w']);
   await registry.call('start_alignment',{project_id:'p',model_id:'m',...scope},f);
   expect(JSON.parse(String(calls.at(-1)!.init!.body)).params).toMatchObject({scope_ids:['r1','r2'],scope_envelope_ids:[kind==='line'?'l':'w']});
@@ -47,4 +47,28 @@ it('splits non-ruby body words while preserving existing ruby words in the same 
  expect(result).toMatchObject({changed_count:1,skipped_existing_ruby_count:1,blocked_count:0});
  expect(f.doc().lyrics.lines[0].words.map(w=>w.text)).toEqual(['愛','べ','る']);
  expect(f.doc().lyrics.lines[0].words[0]).toEqual(doc.lyrics.lines[0].words[0]);expect(f.writes()).toBe(1);
+});
+
+it('reports discontiguous pronounceable targets without rejecting and keeps metadata off HTTP options', async()=>{
+ const doc=fixture();
+ const row=(id:string,text:string,beginMs:number)=>({...createLine('',id),beginMs,endMs:beginMs+500,words:[{...createWord(text,`${id}-w`),beginMs,endMs:beginMs+500}]});
+ doc.lyrics.lines.push(row('middle','声',2500),row('last','あ',3500));
+ doc.lineOrder=['l','middle','last'];
+ const calls:{url:URL;init?:RequestInit}[]=[];
+ const f=projectFixture(doc,(url,init)=>{calls.push({url,init});return Response.json(url.pathname.endsWith('/jobs')?{items:[]}:url.pathname.endsWith('/alignment-preview')?{model_preview:'token',emitting_count:3}:{id:'j',project_id:'p',kind:'alignment',status:'queued'});});
+ const registry=createToolRegistry(),base={project_id:'p',model_id:'m'};
+ for(const scope of [{scope_line_ids:['l','last']},{scope_word_ids:['w','last-w']}]){
+  expect(await registry.call('preview_alignment',{...base,...scope},f)).toMatchObject({envelope_ms:[scope.scope_line_ids?100:200,4000],warnings:[expect.stringMatching(/1 unselected pronounceable.*lines 2–2/)]});
+  await registry.call('start_alignment',{...base,...scope},f);
+  const params=JSON.parse(String(calls.at(-1)!.init!.body)).params;
+  expect(params).not.toHaveProperty('warnings');expect(params).not.toHaveProperty('envelope_ms');
+ }
+ expect(await registry.call('preview_alignment',{...base,scope_ids:['r1','r2']},f)).toMatchObject({envelope_ms:[300,1000]});
+ for(const text of ['','   ','、!?']){
+  doc.lyrics.lines[1].words[0].text=text;
+  const blank=projectFixture(doc,()=>Response.json({model_preview:'token',emitting_count:3}));
+  expect(await registry.call('preview_alignment',{...base,scope_line_ids:['l','last']},blank)).not.toHaveProperty('warnings');
+ }
+ expect(await registry.call('preview_alignment',{...base,scope_line_ids:['l','middle']},f)).not.toHaveProperty('warnings');
+ expect(await registry.call('preview_alignment',base,f)).not.toHaveProperty('envelope_ms');
 });
