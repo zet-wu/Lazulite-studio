@@ -1736,5 +1736,18 @@
   "import.unknownAgent": "补建 {{count}} 个未声明的歌手",
   "import.orphan": "跳过 {{count}} 条孤立附属行",
   "import.reversed": "{{count}} 处起止时间倒置（已保留原时间）",
-  "batch.smoothPreview": "将调整 {{count}} 处读音边界"
+  "batch.smoothPreview": "将调整 {{count}} 处读音边界",
+  "demo.badge": "在线演示",
+  "demo.local": "项目与音频保存在此浏览器中，请及时导出歌词备份。",
+  "demo.site": "介绍与完整版下载",
+  "demo.desktopOnly": "仅桌面完整版支持",
+  "demo.desktopHelp": "此功能需要桌面完整版。可下载完整版继续制作歌词。",
+  "demo.download": "下载桌面完整版",
+  "demo.emptyHelp": "新建项目，选择本地音频并导入歌词，即可开始编辑与打轴。数据仅存于当前浏览器，清除网站数据会删除项目。",
+  "demo.ephemeral": "浏览器存储空间不足，当前音频仅保留在本次会话中，刷新页面后需重新选择音频。",
+  "demo.audioMissing": "此音频未保存在浏览器中，请重新选择本地音频。",
+  "demo.storageUnavailable": "浏览器项目存储不可用，请允许此网站使用本地存储后重试。",
+  "demo.decodeFailed": "浏览器无法解码此音频，请转换为 WAV、MP3 或浏览器支持的格式后重试。",
+  "demo.processing": "正在本地解码音频…",
+  "demo.storageFailed": "项目保存失败，浏览器存储空间可能不足。请导出歌词备份并释放空间后重试。"
 }

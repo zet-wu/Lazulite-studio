@@ -1750,5 +1750,18 @@
   "import.unknownAgent": "Created {{count}} undeclared singers",
   "import.orphan": "Skipped {{count}} orphan attached lines",
   "import.reversed": "{{count}} reversed timing ranges (original times preserved)",
-  "batch.smoothPreview": "Will adjust {{count}} reading boundaries"
+  "batch.smoothPreview": "Will adjust {{count}} reading boundaries",
+  "demo.badge": "Online demo",
+  "demo.local": "Projects and audio stay in this browser. Export your lyrics to keep a backup.",
+  "demo.site": "About & desktop download",
+  "demo.desktopOnly": "Available in the desktop edition",
+  "demo.desktopHelp": "Download the desktop edition to use this feature and continue working on your lyrics.",
+  "demo.download": "Download desktop edition",
+  "demo.emptyHelp": "Create a project, select local audio and import lyrics to start editing and timing. Clearing site data deletes your projects.",
+  "demo.ephemeral": "Browser storage is unavailable or full. This audio stays in this session only. Select it again after refreshing.",
+  "demo.audioMissing": "This audio is no longer available. Select your local audio again.",
+  "demo.storageUnavailable": "Project storage is unavailable. Allow local storage for this site and try again.",
+  "demo.decodeFailed": "This browser cannot decode the audio. Try WAV, MP3 or another supported format.",
+  "demo.processing": "Decoding audio locally…",
+  "demo.storageFailed": "Could not save the project. Export your lyrics and free browser storage before trying again."
 }

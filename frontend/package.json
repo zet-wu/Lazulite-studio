@@ -6,8 +6,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:demo": "cross-env VITE_STUDIO_RUNTIME=browser vite",
     "dev:mock": "cross-env VITE_ENABLE_MOCKS=true vite",
     "build": "tsc -b && vite build",
+    "build:demo": "tsc -b && cross-env VITE_STUDIO_RUNTIME=browser vite build --outDir dist-demo",
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run",
     "test:e2e": "playwright test",

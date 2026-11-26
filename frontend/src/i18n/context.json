@@ -11387,5 +11387,83 @@
     "parameterNotes": {
       "count": "本次统计项数"
     }
+  },
+  "demo.badge": {
+    "context": "Browser demo runtime, local storage and desktop download guidance",
+    "source": "在线演示",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "demo.local": {
+    "context": "Browser demo runtime, local storage and desktop download guidance",
+    "source": "项目与音频保存在此浏览器中，请及时导出歌词备份。",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "demo.site": {
+    "context": "Browser demo runtime, local storage and desktop download guidance",
+    "source": "介绍与完整版下载",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "demo.desktopOnly": {
+    "context": "Browser demo runtime, local storage and desktop download guidance",
+    "source": "仅桌面完整版支持",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "demo.desktopHelp": {
+    "context": "Browser demo runtime, local storage and desktop download guidance",
+    "source": "此功能需要桌面完整版。可下载完整版继续制作歌词。",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "demo.download": {
+    "context": "Browser demo runtime, local storage and desktop download guidance",
+    "source": "下载桌面完整版",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "demo.emptyHelp": {
+    "context": "Browser demo runtime, local storage and desktop download guidance",
+    "source": "新建项目，选择本地音频并导入歌词，即可开始编辑与打轴。数据仅存于当前浏览器，清除网站数据会删除项目。",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "demo.ephemeral": {
+    "context": "Browser demo runtime, local storage and desktop download guidance",
+    "source": "浏览器存储空间不足，当前音频仅保留在本次会话中，刷新页面后需重新选择音频。",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "demo.audioMissing": {
+    "context": "Browser demo runtime, local storage and desktop download guidance",
+    "source": "此音频未保存在浏览器中，请重新选择本地音频。",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "demo.storageUnavailable": {
+    "context": "Browser demo runtime, local storage and desktop download guidance",
+    "source": "浏览器项目存储不可用，请允许此网站使用本地存储后重试。",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "demo.decodeFailed": {
+    "context": "Browser demo runtime, local storage and desktop download guidance",
+    "source": "浏览器无法解码此音频，请转换为 WAV、MP3 或浏览器支持的格式后重试。",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "demo.processing": {
+    "context": "Browser demo runtime, local storage and desktop download guidance",
+    "source": "正在本地解码音频…",
+    "params": [],
+    "parameterNotes": {}
+  },
+  "demo.storageFailed": {
+    "context": "Browser demo runtime, local storage and desktop download guidance",
+    "source": "项目保存失败，浏览器存储空间可能不足。请导出歌词备份并释放空间后重试。",
+    "params": [],
+    "parameterNotes": {}
   }
 }

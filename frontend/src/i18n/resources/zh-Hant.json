@@ -1736,5 +1736,18 @@
   "import.unknownAgent": "補建 {{count}} 個未宣告的歌手",
   "import.orphan": "跳過 {{count}} 條孤立附屬行",
   "import.reversed": "{{count}} 處起止時間倒置（已保留原時間）",
-  "batch.smoothPreview": "將調整 {{count}} 處讀音邊界"
+  "batch.smoothPreview": "將調整 {{count}} 處讀音邊界",
+  "demo.badge": "線上示範",
+  "demo.local": "專案與音訊儲存在此瀏覽器中，請及時匯出歌詞備份。",
+  "demo.site": "介紹與完整版下載",
+  "demo.desktopOnly": "僅桌面完整版支援",
+  "demo.desktopHelp": "此功能需要桌面完整版。可下載完整版繼續製作歌詞。",
+  "demo.download": "下載桌面完整版",
+  "demo.emptyHelp": "建立專案，選擇本機音訊並匯入歌詞，即可開始編輯與打軸。資料僅儲存在目前瀏覽器，清除網站資料會刪除專案。",
+  "demo.ephemeral": "瀏覽器儲存空間不足，目前音訊僅保留在本次工作階段，重新整理後需重新選擇音訊。",
+  "demo.audioMissing": "此音訊未儲存在瀏覽器中，請重新選擇本機音訊。",
+  "demo.storageUnavailable": "瀏覽器專案儲存無法使用，請允許此網站使用本機儲存後重試。",
+  "demo.decodeFailed": "瀏覽器無法解碼此音訊，請轉換為 WAV、MP3 或瀏覽器支援的格式後重試。",
+  "demo.processing": "正在本機解碼音訊…",
+  "demo.storageFailed": "專案儲存失敗，瀏覽器儲存空間可能不足。請匯出歌詞備份並釋放空間後重試。"
 }
