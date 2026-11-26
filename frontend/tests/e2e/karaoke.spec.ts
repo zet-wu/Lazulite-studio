@@ -108,3 +108,21 @@ for(const mode of ['编辑','打轴','音频处理']) test(`timeline cue selecti
  await expect(page.getByLabel('工作模式',{exact:true}).getByRole('button',{name:mode,exact:true})).toHaveAttribute('aria-current','page');
  for(const key of ['Enter','Space']) {await cue.focus();await cue.press(key);await expect(cue).toHaveAttribute('aria-pressed','true');await expect(page.getByLabel('工作模式',{exact:true}).getByRole('button',{name:mode,exact:true})).toHaveAttribute('aria-current','page');}
 });
+
+for(const mode of ['编辑','音频处理']) for(const custom of [false,true]) test(`mouse-selected timeline cue receives ${custom?'custom remove':'Delete'} in ${mode}`,async({page},info)=>{
+ if(custom)await page.addInitScript(()=>localStorage.setItem('lazulite-shortcuts',JSON.stringify({remove:{code:'Backspace',ctrl:false,meta:false,alt:true,shift:false}})));
+ await page.setViewportSize({width:1440,height:1000});await loadTimeline(page);
+ await importLyrics(page,{name:'karaoke.ttml',mimeType:'application/xml',buffer:Buffer.from(xml)});
+ await page.getByRole('button',{name:'卡拉 OK',exact:true}).click();
+ await page.getByRole('button',{name:'添加行前导唱',exact:true}).first().click();
+ await page.locator('main [data-word-id="w"]').click();
+ await page.getByLabel('工作模式',{exact:true}).getByRole('button',{name:mode,exact:true}).click();
+ const cue=page.getByRole('button',{name:'时间轴导唱 ●',exact:true}),remove=custom?'Alt+Backspace':'Delete';
+ for(const target of [cue,cue.getByRole('button',{name:'导唱开始端点',exact:true}),cue.getByRole('button',{name:'导唱结束端点',exact:true})]){
+  await target.click();await expect(cue).toHaveAttribute('aria-pressed','true');await expect(target).toBeFocused();
+  await page.keyboard.press(remove);await expect(cue).toHaveCount(0);
+  await page.getByRole('button',{name:'撤销',exact:true}).click();await expect(cue).toHaveCount(1);
+ }
+ await expect(page.locator('[data-outline-drag]')).toHaveCount(2);
+ await info.attach('selected-cue-focus',{body:JSON.stringify({mode,binding:remove,targets:['cue','begin-handle','end-handle'],deleted_and_undone:true}),contentType:'application/json'});
+});

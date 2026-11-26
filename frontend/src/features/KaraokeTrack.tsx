@@ -1,3 +1,4 @@
+import { focusObject } from './editor/selection-recovery';
 import { useShortcuts, matchesBinding, shortcutInput } from './shortcuts';
 import { useContext } from 'react';
 import { TimelineIndicatorContext } from './TimelineIndicators';
@@ -28,7 +29,7 @@ export function KaraokeTrack({startMs,endMs,snap,bpm,anchors,onError,durationMs=
  const {project,apply,locked}=context;
  const cues=project.karaoke.cues.filter(c=>c.id===drag?.cue.id || c.endMs>=startMs-paddingMs&&c.beginMs<=endMs+paddingMs),layout=packIntervals(cues.map(c=>({...c,key:c.id}))),span=Math.max(1,endMs-startMs);
  const begin=(e:PointerEvent<HTMLElement>,cue:KaraokeCue,side:Drag['side'])=>{
-  if(e.button!==0||locked)return;e.preventDefault();e.stopPropagation();shared.selectCue(cue.id,cue.anchor.lineId,false);
+  if(e.button!==0||locked)return;e.preventDefault();e.stopPropagation();focusObject(e.currentTarget);shared.selectCue(cue.id,cue.anchor.lineId,false);
   e.currentTarget.setPointerCapture(e.pointerId);
   current.current={viewStartMs:timelineViewStart(e.currentTarget,startMs),cue,side,x:e.clientX,width:lane.current!.clientWidth,beginMs:cue.beginMs,endMs:cue.endMs,error:'',pointer:e.pointerId,element:e.currentTarget};setDrag(current.current);
  };
