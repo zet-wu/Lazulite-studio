@@ -1,3 +1,4 @@
+import { useShortcuts, matchesBinding, shortcutInput } from './shortcuts';
 import { useContext } from 'react';
 import { TimelineIndicatorContext } from './TimelineIndicators';
 import { TimelineContent, timelineViewStart } from './TimelineContent';
@@ -15,6 +16,7 @@ import styles from './karaoke.module.css';
 type Drag = { viewStartMs:number; cue: KaraokeCue; side:'move'|'beginMs'|'endMs'; x:number; width:number; beginMs:number; endMs:number; error:string | Message; pointer:number; element:HTMLElement };
 export function KaraokeTrack({startMs,endMs,snap,bpm,anchors,onError,durationMs=null}:{durationMs?:number|null;startMs:number;endMs:number;snap:boolean;bpm:number;anchors:number[];onError:(message:string | Message)=>void}) {
   useTranslation();
+ const keys = useShortcuts();
  const {paddingMs=0}=useContext(TimelineIndicatorContext);
  const context=useKaraokeProject(),shared=useEditorSelection()!,lane=useRef<HTMLDivElement>(null),[drag,setDrag]=useState<Drag|null>(null),current=useRef<Drag|null>(null);
  const cancel=()=>{const value=current.current;current.current=null;setDrag(null);if(value?.element.hasPointerCapture(value.pointer))value.element.releasePointerCapture(value.pointer);};
@@ -49,11 +51,16 @@ export function KaraokeTrack({startMs,endMs,snap,bpm,anchors,onError,durationMs=
   current.current={...value,beginMs,endMs:end,error};setDrag(current.current);onError(error);
  };
  const finish=()=>{const value=current.current;cancel();if(!value||value.error)return;try{apply({type:'karaoke',command:{kind:'cue',id:value.cue.id,text:value.cue.text,beginMs:value.beginMs,endMs:value.endMs}});}catch(e){onError(errorMessage(e));}};
- return <div className={styles.track} aria-label={t('karaoke.guideTrack')}><strong data-timeline-text>{t('karaoke.cue')}</strong><div ref={lane} className={styles.lane} style={{height:`calc(${Math.max(1,layout.laneCount)} * var(--timeline-lane-height))`}}>
+ return <div className={styles.track} aria-label={t('karaoke.guideTrack')} tabIndex={-1} onKeyDown={event=>{
+   if (!matchesBinding(event.nativeEvent,keys.remove) || event.repeat || event.nativeEvent.isComposing || shortcutInput(event.target,event.code)) return;
+   event.preventDefault();event.stopPropagation();
+   const id=(event.target as Element).closest<HTMLElement>('[data-cue-id]')?.dataset.cueId ?? shared.selectedCue;
+   if (!locked && !current.current && id) { try { apply({type:'karaoke',command:{kind:'remove',id}}); } catch(cause) { onError(errorMessage(cause)); } }
+ }}><strong data-timeline-text>{t('karaoke.cue')}</strong><div ref={lane} className={styles.lane} style={{height:`calc(${Math.max(1,layout.laneCount)} * var(--timeline-lane-height))`}}>
  <TimelineContent>{cues.map(cue=>{const value=drag?.cue.id===cue.id?drag:cue;return <div role="button" tabIndex={0} aria-label={t('karaoke.timelineCue',{text:cue.text})} aria-pressed={shared.selectedCue===cue.id} className={styles.bar} key={cue.id} data-cue-id={cue.id} data-invalid={drag?.cue.id===cue.id&&!!drag.error||undefined}
  style={{left:`${(value.beginMs-startMs)/span*100}%`,width:`${(value.endMs-value.beginMs)/span*100}%`,top:`calc(${layout.lanes.get(cue.id)??0} * var(--timeline-lane-height) + var(--timeline-bar-inset))`}}
  onContextMenu={event=>{event.preventDefault();event.stopPropagation();shared.commands.current?.openContext(event.currentTarget,event.clientX,event.clientY);}} onClick={()=>shared.selectCue(cue.id,cue.anchor.lineId,false)} onPointerDown={e=>begin(e,cue,'move')} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={cancel}
- onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();shared.selectCue(cue.id,cue.anchor.lineId,false);}if(e.key==='Delete'&&!locked){e.stopPropagation();apply({type:'karaoke',command:{kind:'remove',id:cue.id}});}}}>
+ onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();shared.selectCue(cue.id,cue.anchor.lineId,false);}}}>
  <button className={styles.handle} aria-label={t('karaoke.guideBegin')} onPointerDown={e=>begin(e,cue,'beginMs')}/><span>{cue.text}</span><button className={styles.handle} aria-label={t('karaoke.guideEnd')} onPointerDown={e=>begin(e,cue,'endMs')}/></div>;})}</TimelineContent></div></div>;
 }
 

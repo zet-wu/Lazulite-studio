@@ -1,3 +1,4 @@
+import { useShortcuts, matchesBinding, shortcutInput } from './shortcuts';
 import { TimelineContent, timelineViewStart } from './TimelineContent';
 import { ContextMenu } from '../shared/ContextMenu';
 import { MessageError, errorMessage, type Message, message as describeMessage } from '../domain/messages';
@@ -26,6 +27,7 @@ type Drag = { viewStartMs: number; error?: string | Message; segment?: VocalSegm
 export const VOCAL_LINE_MIME = 'application/x-studio-vocal-line';
 export function VocalTracks(props: Props) {
   useTranslation();
+  const keys = useShortcuts();
   const { acoustics, startMs, endMs, durationMs } = props;
   const { publish, paddingMs = 0 } = useContext(TimelineIndicatorContext);
   const capture = useRef<{ element: HTMLElement; id: number } | null>(null);
@@ -136,7 +138,12 @@ export function VocalTracks(props: Props) {
   const preview=drag?.candidate??null;
   const pct=(time:number)=>(time-startMs)/span*100;
   const upper=energyView?.upper??null;
-  return <div className={styles.tracks} data-vocal-tracks data-vocal-focus tabIndex={-1} onPointerDownCapture={e=>{if(adding&&e.currentTarget.contains(e.target as Node)&&!(e.target as Element).closest('[data-timeline-text]'))begin(e);}} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={clearDrag}>
+  return <div className={styles.tracks} data-vocal-tracks data-vocal-focus tabIndex={-1} onKeyDown={event=>{
+      if (!matchesBinding(event.nativeEvent,keys.remove) || event.repeat || event.nativeEvent.isComposing || shortcutInput(event.target,event.code)) return;
+      // Own the key even when locked so it cannot delete a lyric selection below.
+      event.preventDefault();event.stopPropagation();
+      if (!props.locked && !adding && !dragRef.current && selected.length) operate('delete');
+    }} onPointerDownCapture={e=>{if(adding&&e.currentTarget.contains(e.target as Node)&&!(e.target as Element).closest('[data-timeline-text]'))begin(e);}} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={clearDrag}>
     <VocalFocus active={adding} cancel={cancel}/>
     {toolsHost && createPortal(<><span data-vocal-hint>{adding?t('vocal.dragCreate'):[props.lineLabel,selected.length===1?labels.get(selected[0]):selected.length?t('vocal.selectedCount',{count:selected.length}):''].filter(Boolean).join(' → ')||t('vocal.noSelection')}</span><button data-role="primary" disabled={props.locked||adding||!active||!props.selectedLineId} onClick={()=>assign(props.selectedLineId,active)}>{t('vocal.assign')}</button><button data-role="secondary" ref={addButton} disabled={props.locked||adding} onClick={()=>{props.pause();setAdding(true);setMenu(null);}}>{t('vocal.newSegment')}</button></>,toolsHost)}
     {props.children}

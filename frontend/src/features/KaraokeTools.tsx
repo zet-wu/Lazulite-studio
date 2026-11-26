@@ -1,3 +1,5 @@
+import { useShortcuts, matchesBinding, shortcutInput } from './shortcuts';
+import { useKaraokeProject } from './KaraokeContext';
 import { SettingField } from '../shared/SettingsFields';
 import fields from '../shared/settings-fields.module.css';
 import { SugSingersDialog } from './SugSingersDialog';
@@ -21,12 +23,13 @@ import styles from './karaoke.module.css';
 import './editor/management-table.css';
 export function CueSlot({project, anchor, apply}: {project:ProjectDocument;anchor:CueAnchor;apply:(command:KaraokeCommand)=>void}) {
   useTranslation();
+  const keys=useShortcuts(), locked=useKaraokeProject()?.locked ?? false;
   const shared=useEditorSelection()!, cues=project.karaoke.cues.filter(cue=>anchorKey(cue.anchor)===anchorKey(anchor));
   const [editing,setEditing]=useState<string|null>(null),[error,setError]=useMessageText('');
   const run=(command:KaraokeCommand)=>{try{apply(command);setError('');return true;}catch(e){setError(errorMessage(e));return false;}};
   const render=(cue:KaraokeCue)=><span key={cue.id} className={styles.cue} role="button" tabIndex={0} data-cue-id={cue.id} aria-label={t('karaoke.cueLabel',{text:cue.text})} aria-pressed={shared.selectedCue===cue.id} onPointerDown={event=>event.stopPropagation()}
     onClick={event=>{event.stopPropagation();shared.selectCue(cue.id,cue.anchor.lineId);}} onDoubleClick={event=>{event.stopPropagation();setEditing(cue.id);}}
-    onKeyDown={event=>{if(event.target!==event.currentTarget)return;if(event.key==='Enter'||event.key===' '){event.preventDefault();shared.selectCue(cue.id,cue.anchor.lineId);}if(event.key==='F2')setEditing(cue.id);if(event.key==='Delete'){event.stopPropagation();run({kind:'remove',id:cue.id});}}}>
+    onKeyDown={event=>{if(shortcutInput(event.target,event.code))return;if(event.key==='Enter'||event.key===' '){event.preventDefault();shared.selectCue(cue.id,cue.anchor.lineId);}if(event.key==='F2')setEditing(cue.id);if(matchesBinding(event.nativeEvent,keys.remove)&&!event.repeat&&!event.nativeEvent.isComposing){event.preventDefault();event.stopPropagation();if(!locked&&!editing)run({kind:'remove',id:cue.id});}}}>
     {editing===cue.id?<DraftInput value={cue.text} label={t('karaoke.cueText')} inputRef={node=>node?.focus()} onCommit={text=>{if(run({kind:'cue',id:cue.id,text,beginMs:cue.beginMs,endMs:cue.endMs}))setEditing(null);}}/>:cue.text}{error&&<small role="alert">{error}</small>}</span>;
   if(anchor.kind==='before')return <>{cues.sort((a,b)=>a.beginMs-b.beginMs).map(render)}</>;
   if(cues.length)return <>{cues.map(render)}</>;

@@ -1,3 +1,4 @@
+import { useShortcuts, matchesBinding, shortcutInput } from './shortcuts';
 import { TimelineContent, timelineViewStart } from './TimelineContent';
 import { useTimelineAutoExpand, useTimelineSwapBoundaryDrag } from '../adapters/timeline-preferences';
 import { TimelineStaging } from './TimelineStaging';
@@ -38,6 +39,7 @@ const intervalSpan = (begin: number, end: number): [number, number] => begin <= 
 
 export function TimelineTracks({ playbackFrame, follow = false, locked, document, selectedLineId, startMs, endMs, positionMs, bpm, snap, visible, externalAnchors = [], durationMs = null, apply, onLocate, onPan, onError }: Props) {
   useTranslation();
+  const keys = useShortcuts();
   const editing = useProjectEditing();
   const {paddingMs = 0} = useContext(TimelineIndicatorContext);
   const projectContext = useContext(KaraokeContext);
@@ -443,7 +445,7 @@ export function TimelineTracks({ playbackFrame, follow = false, locked, document
       onKeyDown={event => {
         if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(target, event.shiftKey, event.ctrlKey || event.metaKey); }
         if (!locked && (event.key === 'ContextMenu' || event.shiftKey && event.key === 'F10')) { event.preventDefault(); const box = event.currentTarget.getBoundingClientRect(); if(!commands.current?.openContext(event.currentTarget,box.left,box.bottom)){choose(target);setMenu({ x: box.left, y: box.bottom, target: event.currentTarget });} }
-        if (event.key === 'Delete' && !event.repeat && !event.nativeEvent.isComposing && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && !dragRef.current) { event.preventDefault(); event.stopPropagation(); commands.current?.remove(); }
+        if (matchesBinding(event.nativeEvent, keys.remove) && !event.repeat && !event.nativeEvent.isComposing && !shortcutInput(event.target,event.code) && !locked && !dragRef.current) { event.preventDefault(); event.stopPropagation(); commands.current?.remove(); }
       }}>
       {narrow && <><span data-time-color className={styles.narrowColor} style={{ width: (right - clippedBegin) / spanMs * plotWidth }} /><span className={styles.narrowMarker} title={t('timeline.narrow')} /></>}
       {(!narrow || leftGhost) && <span className={`${styles.trackHandle} ${reversed ? styles.reversedLeftHandle : ''} ${leftGhost ? styles.temporaryHandle : ''}`} title={leftGhost ? leftDescription : undefined} aria-label={t(leftSide === 'beginMs' ? 'timeline.beginBoundary' : 'timeline.endBoundary',{label})} onPointerDown={(event) => begin(event, target, leftSide, leftValue)} onPointerMove={move} onPointerUp={finish} />}
@@ -465,7 +467,7 @@ export function TimelineTracks({ playbackFrame, follow = false, locked, document
     } catch (cause) { onError(errorMessage(cause)); }
   };
   return <div ref={tracksRef} className={styles.tracks} data-editable-timeline aria-label={t('timeline.editable')} tabIndex={-1} onFocusCapture={() => { area.current = 'timeline'; }}
-    onKeyDown={event => { if (event.key === 'Delete' && !locked && !event.repeat && !event.nativeEvent.isComposing && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey && !dragRef.current) { event.preventDefault(); event.stopPropagation(); commands.current?.remove(); } }}
+    onKeyDown={event => { if (matchesBinding(event.nativeEvent, keys.remove) && !locked && !event.repeat && !event.nativeEvent.isComposing && !shortcutInput(event.target,event.code) && !locked && !dragRef.current) { event.preventDefault(); event.stopPropagation(); commands.current?.remove(); } }}
     onCopy={event => { if ((event.target as Element).closest('input,textarea,[contenteditable="true"]')) return; if (!commands.current?.canCopy || window.getSelection()?.toString()) return; const value = commands.current.copy(); if (value) { event.preventDefault(); event.clipboardData.setData('text/plain', value.text); event.clipboardData.setData('application/x-lazulite-lyric', commands.current.clipboardToken()); } }}
     onCut={event => { if ((event.target as Element).closest('input,textarea,[contenteditable="true"]')) return; if (!commands.current?.canCopy || window.getSelection()?.toString()) return; const value = commands.current.cut(); if (value) { event.preventDefault(); event.clipboardData.setData('text/plain', value.text); event.clipboardData.setData('application/x-lazulite-lyric', commands.current.clipboardToken()); } }}
     onPaste={event => { if ((event.target as Element).closest('input,textarea,[contenteditable="true"]')) return; event.preventDefault(); commands.current?.paste(event.clipboardData.getData('application/x-lazulite-lyric') === commands.current.clipboardToken() ? undefined : event.clipboardData.getData('text/plain')); }}>
