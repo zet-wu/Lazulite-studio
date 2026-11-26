@@ -1,3 +1,5 @@
+import { isBrowserRuntime } from '../../adapters/runtime';
+import { DesktopOnlyDialog } from '../../shared/DesktopOnlyNotice';
 import { useMessageText } from '../../shared/useMessageText';
 import { message as describeMessage, errorMessage } from '../../domain/messages';
 import { i18n } from '../../i18n';
@@ -16,7 +18,7 @@ import styles from './dictionary-ruby.module.css';
 import preview from './semantic-editor.module.css';
 import { ReadingInput, ReadingPair } from './ReadingPreview';
 
-export function DictionaryRubyDialog({document,lineIds,apply,close}:{document:LyricDocument;lineIds:string[];apply:(c:LyricCommand)=>boolean;close:()=>void}) {
+function FullDictionaryRubyDialog({document,lineIds,apply,close}:{document:LyricDocument;lineIds:string[];apply:(c:LyricCommand)=>boolean;close:()=>void}) {
   useTranslation();
   const [source]=useState(document),[ids]=useState(lineIds);
   const [items,setItems]=useState<DictionaryInfo[]>([]),[selected,setSelected]=useState('');
@@ -109,3 +111,7 @@ export function DictionaryRubyDialog({document,lineIds,apply,close}:{document:Ly
 }
 
 const t=i18n.t.bind(i18n);
+
+export function DictionaryRubyDialog(props: Parameters<typeof FullDictionaryRubyDialog>[0]) {
+  return isBrowserRuntime ? <DesktopOnlyDialog close={props.close} /> : <FullDictionaryRubyDialog {...props} />;
+}

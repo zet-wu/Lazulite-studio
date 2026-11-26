@@ -1,3 +1,5 @@
+import { isBrowserRuntime } from '../adapters/runtime';
+import { DesktopDownloadLink, DesktopOnlyDialog } from '../shared/DesktopOnlyNotice';
 import { errorMessage, message } from '../domain/messages';
 import { useMessageText } from '../shared/useMessageText';
 import { i18n, formatDate } from '../i18n';
@@ -19,11 +21,13 @@ export function ProjectList() {
     queryKey: ["projects"],
     queryFn: () => studioApi.listProjects(),
   });
+  const [desktopOnly, setDesktopOnly] = useState(false);
+  const archiveNotice = desktopOnly && <DesktopOnlyDialog close={() => setDesktopOnly(false)}/>;
   const archiveInput = useRef<HTMLInputElement>(null);
   const [archiveBusy, setArchiveBusy] = useState<string | null>(null);
   const [archiveError, setArchiveError] = useMessageText('');
   const importControl = <>
-    <button data-role="secondary" disabled={!!archiveBusy} onClick={()=>archiveInput.current?.click()}>{archiveBusy==='import'?t('projects.importing'):t('projects.import')}</button>
+    <button data-role="secondary" disabled={!!archiveBusy} onClick={()=>isBrowserRuntime ? setDesktopOnly(true) : archiveInput.current?.click()}>{archiveBusy==='import'?t('projects.importing'):t('projects.import')}</button>
     <input ref={archiveInput} hidden type="file" accept=".lazp" aria-label={t('projects.archive')} onChange={async event=>{
       const file=event.target.files?.[0];event.target.value='';if(!file)return;
       setArchiveBusy('import');setArchiveError('');
@@ -33,6 +37,7 @@ export function ProjectList() {
     }}/>
   </>;
   const exportProject = async (id:string,name:string) => {
+    if (isBrowserRuntime) { setDesktopOnly(true); return; }
     setArchiveBusy(id);setArchiveError('');
     try {
       const blob=await studioApi.exportProject(id), url=URL.createObjectURL(blob), link=document.createElement('a');
@@ -89,9 +94,11 @@ export function ProjectList() {
     return (
       <main className={styles.centerState}>
         <strong>{t('projects.empty')}</strong>
+        {archiveNotice}
+        {isBrowserRuntime && <><p className={styles.demoHelp}>{t('demo.emptyHelp')}</p><DesktopDownloadLink/></>}
         {importControl}
         {archiveError && <p role="alert">{archiveError}</p>}
-        <p className={styles.muted}>{t('projects.emptyHelp')}</p>
+        {!isBrowserRuntime && <p className={styles.muted}>{t('projects.emptyHelp')}</p>}
         <CreateProject
           onCreated={(id) => window.location.assign(`/projects/${id}/edit`)}
         />
@@ -99,6 +106,7 @@ export function ProjectList() {
     );
   return (
     <main className={styles.projectsPage}>
+      {archiveNotice}
       <div className={styles.pageHeading}>
         <div>
           <h1>{t('projects.title')}</h1>
@@ -115,6 +123,7 @@ export function ProjectList() {
         <label className={styles.search}>
           <Icon name="search"/>
           <input
+            aria-label={t('projects.search')}
             placeholder={t('projects.search')}
             value={search}
             onChange={(event) => setSearch(event.target.value)}

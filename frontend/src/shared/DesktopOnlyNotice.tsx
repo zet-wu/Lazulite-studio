@@ -20,8 +20,18 @@ export function DesktopOnlyNotice() {
 export function DesktopOnlyDialog({ close }: { close: () => void }) {
   const { t } = useTranslation();
   const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => { dialog.current?.showModal(); }, []);
-  return <dialog ref={dialog} className={styles.dialog} aria-label={t('demo.desktopOnly')} onCancel={close} onClose={close}>
+  useEffect(() => {
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const element = dialog.current;
+    element?.showModal();
+    return () => { element?.close(); if (previous?.isConnected) previous.focus(); };
+  }, []);
+  return <dialog ref={dialog} className={styles.dialog} aria-label={t('demo.desktopOnly')} onCancel={event => { event.preventDefault(); close(); }} onKeyDown={event => {
+    if (event.key !== 'Tab') return;
+    const items = Array.from(dialog.current?.querySelectorAll<HTMLElement>('a[href], button:not(:disabled)') ?? []);
+    const target = event.shiftKey ? items.at(-1) : items[0];
+    if (document.activeElement === (event.shiftKey ? items[0] : items.at(-1))) { event.preventDefault(); target?.focus(); }
+  }}>
     <DesktopOnlyNotice />
     <button type="button" data-role="secondary" autoFocus onClick={close}>{t('common.close')}</button>
   </dialog>;

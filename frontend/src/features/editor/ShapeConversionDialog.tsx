@@ -1,3 +1,5 @@
+import { isBrowserRuntime } from '../../adapters/runtime';
+import { DesktopOnlyDialog } from '../../shared/DesktopOnlyNotice';
 import { useMessageText } from '../../shared/useMessageText';
 import { errorMessage } from '../../domain/messages';
 import { i18n } from '../../i18n';
@@ -24,7 +26,7 @@ function ShapeInput({cell,disabled,change,focus,composition}:{cell:ShapeCell;dis
     onKeyDown={event=>{if(composing.current||event.nativeEvent.isComposing){event.stopPropagation();return;}if(event.key==='Escape'){event.preventDefault();event.stopPropagation();change(initial.current.value,initial.current.edited);}if(event.key==='Enter'){event.preventDefault();event.currentTarget.blur();}}}/>;
 }
 
-export function ShapeConversionDialog({document,lineIds,apply,close}:{document:LyricDocument;lineIds:string[];apply:(command:LyricCommand)=>boolean;close:()=>void}) {
+function FullShapeConversionDialog({document,lineIds,apply,close}:{document:LyricDocument;lineIds:string[];apply:(command:LyricCommand)=>boolean;close:()=>void}) {
   useTranslation();
   const [source]=useState(document),[ids]=useState(lineIds),[target,setTarget]=useState<ShapeTarget>('simplified');
   const [rows,setRows]=useState<ShapeRow[]>([]),[pending,setPending]=useState(true),[error,setError]=useMessageText(''),[ready,setReady]=useState(false),[attempt,setAttempt]=useState(0);
@@ -71,3 +73,7 @@ export function ShapeConversionDialog({document,lineIds,apply,close}:{document:L
 }
 
 const t=i18n.t.bind(i18n);
+
+export function ShapeConversionDialog(props: Parameters<typeof FullShapeConversionDialog>[0]) {
+  return isBrowserRuntime ? <DesktopOnlyDialog close={props.close} /> : <FullShapeConversionDialog {...props} />;
+}

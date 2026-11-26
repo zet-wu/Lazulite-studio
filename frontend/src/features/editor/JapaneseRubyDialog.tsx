@@ -1,3 +1,5 @@
+import { isBrowserRuntime } from '../../adapters/runtime';
+import { DesktopOnlyDialog } from '../../shared/DesktopOnlyNotice';
 import { useMessageText } from '../../shared/useMessageText';
 import { errorMessage } from '../../domain/messages';
 import { i18n } from '../../i18n';
@@ -13,7 +15,7 @@ import { hasJapaneseRubyChanges, japaneseRubyCommand, proposeJapaneseRuby } from
 import { SettingsDialog } from './SettingsDialog';
 import styles from './semantic-editor.module.css';
 
-export function JapaneseRubyDialog({ document, lineIds, apply, close }: { document: LyricDocument; lineIds: string[]; apply: (command: LyricCommand) => boolean; close: () => void }) {
+function FullJapaneseRubyDialog({ document, lineIds, apply, close }: { document: LyricDocument; lineIds: string[]; apply: (command: LyricCommand) => boolean; close: () => void }) {
   useTranslation();
  const [autoMerge,setAutoMerge] = useState(false);
  const [source] = useState(document), [ids] = useState(lineIds);
@@ -74,3 +76,7 @@ export function JapaneseRubyDialog({ document, lineIds, apply, close }: { docume
 }
 
 const t=i18n.t.bind(i18n);
+
+export function JapaneseRubyDialog(props: Parameters<typeof FullJapaneseRubyDialog>[0]) {
+  return isBrowserRuntime ? <DesktopOnlyDialog close={props.close} /> : <FullJapaneseRubyDialog {...props} />;
+}

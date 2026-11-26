@@ -114,9 +114,7 @@ export function CreateProject({
       setError(
         caught instanceof ApiError && caught.status === 401
           ? message('create.expired')
-          : caught instanceof ApiError
-            ? errorMessage(caught)
-            : errorMessage(caught),
+          : errorMessage(caught),
       );
       setStatus("idle");
     } finally {
@@ -132,6 +130,7 @@ export function CreateProject({
       <dialog
         ref={dialog}
         className={styles.modal}
+        aria-label={t('create.new')}
         onCancel={(event) => {
           if (status === "creating") event.preventDefault();
           else { if (status === "uploading") cancelUpload(); if (asset) void studioApi.discardUpload(asset.id).catch(error => setError(errorMessage(error))); }
@@ -178,7 +177,7 @@ export function CreateProject({
           </label>
           {status === "uploading" && (
             <>
-              <progress max="1" value={progress} />
+              <progress aria-label={t('music.progress')} max="1" value={progress} />
               <span className={styles.hint}>
                 {isBrowserRuntime ? t('demo.processing') : progress >= 1
                   ? t('create.processing')
@@ -190,7 +189,7 @@ export function CreateProject({
             <span className={styles.hint}>{t('create.creating')}</span>
           )}
           {error && (
-            <p className={styles.error}>
+            <p role="alert" className={styles.error}>
               {error}
               {sessionExpired && (
                 <>

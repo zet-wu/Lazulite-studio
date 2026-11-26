@@ -1,3 +1,4 @@
+import { isBrowserRuntime } from '../../adapters/runtime';
 import { readSourceMetadata } from '../../adapters/http/source-metadata';
 import { DialogEditingLocked } from './SettingsDialog';
 import { useMessageText } from '../../shared/useMessageText';
@@ -49,7 +50,7 @@ export function MetadataPanel({ document, apply, projectId, sourceAssetId }: Pro
  return <div ref={root}><label className="management-language">{t('metadata.language')}<DraftInput value={document.language ?? ''} label={t('metadata.language')} placeholder="ja / zh-Hans" onCommit={language=>apply({type:'set-language',language:language || null})}/></label>
  <section aria-label={t('metadata.author')}><h3>{t('metadata.author')}</h3>
  <table className="management-table"><tbody><MetadataRow name="songwriter" values={document.metadata.songwriter ?? []} document={document} apply={apply} renamed={()=>{}} deleted={()=>{}} dedicated/></tbody></table></section>
- <section aria-label={t('metadata.amll')}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}><h3>{t('metadata.amll')}</h3><button type="button" data-role="inline" disabled={!sourceAssetId || !projectId || locked || reading} aria-busy={reading} onClick={()=>void fill()}>{t(reading ? 'common.reading' : 'metadata.useSong')}</button></div>{notice && <p role="status">{notice}</p>}
+ <section aria-label={t('metadata.amll')}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}><h3>{t('metadata.amll')}</h3><button type="button" data-role="inline" title={isBrowserRuntime ? t('demo.desktopOnly') : undefined} disabled={isBrowserRuntime || !sourceAssetId || !projectId || locked || reading} aria-busy={reading} onClick={()=>void fill()}>{t(reading ? 'common.reading' : 'metadata.useSong')}</button></div>{notice && <p role="status">{notice}</p>}
  <datalist id="metadata-key-suggestions">{preferred.map(k=><option key={k} value={k}/>)}</datalist>
  <table className="management-table" ref={table}><colgroup><col style={{width:'27%'}}/><col/><col style={{width:80}}/></colgroup><thead><tr><th>{t('metadata.key')}</th><th>{t('metadata.value')}</th><th aria-label={t('common.actions')}/></tr></thead><tbody>
  {Object.entries(document.metadata).filter(([key])=>key !== 'songwriter').map(([key,values],index)=><MetadataRow key={identity(key)} name={key} values={values} apply={apply} document={document} deleted={()=>focusNext(index)} renamed={next=>{ identities.current.set(next,identity(key)); identities.current.delete(key); }}/>) }

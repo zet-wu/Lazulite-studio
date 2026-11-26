@@ -1,3 +1,4 @@
+import { isBrowserRuntime } from '../adapters/runtime';
 import { readSourceMetadata } from '../adapters/http/source-metadata';
 import {message,MessageError,errorMessage} from '../domain/messages';
 import {useMessageText} from '../shared/useMessageText';
@@ -7,7 +8,7 @@ export type SearchConditions = { title: string; artist: string; album: string };
 export const EMPTY_CONDITIONS: SearchConditions = { title: '', artist: '', album: '' };
 export function useSearchConditions(projectId?: string, sourceAssetId?: string) {
   const [values, setValues] = useState<SearchConditions>(EMPTY_CONDITIONS);
-  const [ready, setReady] = useState(!projectId), [error, setError] = useMessageText('');
+  const [ready, setReady] = useState(!projectId || isBrowserRuntime), [error, setError] = useMessageText('');
   const latest = useRef(values), pending = useRef<SearchConditions | null>(null), saving = useRef(false);
   const alive = useRef(true);
   const [readingMetadata, setReadingMetadata] = useState(false), [metadataError, setMetadataError] = useMessageText('');
@@ -30,11 +31,11 @@ export function useSearchConditions(projectId?: string, sourceAssetId?: string) 
   };
   useEffect(() => {
     alive.current = true; const controller = new AbortController();
-    if (projectId) void load(controller.signal);
+    if (projectId && !isBrowserRuntime) void load(controller.signal);
     return () => { alive.current = false; controller.abort(); };
   }, [projectId]);
   const flush = async () => {
-    if (!projectId || saving.current) return;
+    if (isBrowserRuntime || !projectId || saving.current) return;
     saving.current = true;
     try {
       while (pending.current) {
@@ -55,11 +56,11 @@ export function useSearchConditions(projectId?: string, sourceAssetId?: string) 
     editVersion.current++;
     metadataRequest.current?.abort(); setReadingMetadata(false); setMetadataError('');
     latest.current = next; setValues(next);
-    if (projectId) { pending.current = next; void flush(); }
+    if (projectId && !isBrowserRuntime) { pending.current = next; void flush(); }
   };
   const change = (field: keyof SearchConditions, value: string) => replace({ ...latest.current, [field]: value });
   const fillMetadata = async () => {
-    if (!projectId || !sourceAssetId || !ready) return;
+    if (isBrowserRuntime || !projectId || !sourceAssetId || !ready) return;
     metadataRequest.current?.abort();
     const controller = new AbortController(); metadataRequest.current = controller;
     const version = editVersion.current, capturedIdentity = identity;

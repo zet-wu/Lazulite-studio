@@ -1,3 +1,5 @@
+import { isBrowserRuntime, siteUrl } from '../../adapters/runtime';
+import demoStyles from '../../shared/desktop-only-notice.module.css';
 import {changeEditorDisplay} from '../../adapters/editor-display';
 import { StudioSettings } from './StudioSettings';
 import { usePreference } from '../../adapters/studio-preferences';
@@ -47,9 +49,11 @@ export function EditorMenu(props: Props) {
   useEffect(()=>{document.documentElement.dataset.theme=theme;},[theme]);
   const content = <header ref={header} className={styles.header}>
     <Link to="/projects" className={styles.brand}>Lazulite Studio</Link>
+    {isBrowserRuntime && <span className={demoStyles.badge} title={t('demo.local')}>{t('demo.badge')}</span>}
     {props.title !== undefined && <><strong>{props.title}</strong>
     <span>{props.saving ? t('menu.saving') : props.dirty ? t('menu.unsaved') : t('menu.saved')}</span></>}
     <div className={styles.actions}>
+      {isBrowserRuntime && <a className={demoStyles.siteLink} href={siteUrl} target="_blank" rel="noopener noreferrer">{t('demo.site')}</a>}
       {props.title !== undefined && <><IconButton icon="save" label={t('menu.save')} data-role="primary" className={styles.primaryButton} onClick={props.onSave} disabled={props.saving || props.editingLocked}/>
       <IconButton icon="undo" label={t('menu.undo')} data-role="inline" onClick={props.undo} disabled={!props.canUndo}/>
       <IconButton icon="redo" label={t('menu.redo')} data-role="inline" onClick={props.redo} disabled={!props.canRedo}/>

@@ -1,3 +1,5 @@
+import { isBrowserRuntime } from '../adapters/runtime';
+import { DesktopOnlyNotice } from '../shared/DesktopOnlyNotice';
 import {importedWarnings} from '../adapters/import-warnings';
 import { importSugFile } from '../adapters/sug-import';
 import {backgroundDefaults} from '../adapters/studio-preferences';
@@ -78,8 +80,9 @@ export function LyricAcquisition({ store, searchConditions, document, apply, onI
     <section className={styles.pane}><h2>{t('editor.acquire')}</h2><div className={styles.tabs} role="tablist" aria-label={t('acquire.source')}>
       {[['netease',t('source.netease')],['qqmusic',t('source.qq')],['kugou',t('source.kugou')],['amll','AMLL DB'],['embedded', t('source.embedded')], ['file', t('source.file')], ['text', t('source.text')]].map(([id, label]) => <button data-role="secondary" key={id} role="tab" aria-selected={tab === id} onClick={() => { ++request.current; store.setTab(id as typeof tab); setIncoming(null); setMessage(''); }}>{label}</button>)}
     </div>
-      {network && <NetworkLyrics store={store} searchConditions={searchConditions} key={tab} source={tab as Source} document={document} apply={apply} />}
-      {tab === 'embedded' && <EmbeddedLyrics projectId={projectId} sourceAssetId={sourceAssetId} onPreview={parse} />}
+      {isBrowserRuntime && (network || tab === 'embedded') && <DesktopOnlyNotice/>}
+      {!isBrowserRuntime && network && <NetworkLyrics store={store} searchConditions={searchConditions} key={tab} source={tab as Source} document={document} apply={apply} />}
+      {!isBrowserRuntime && tab === 'embedded' && <EmbeddedLyrics projectId={projectId} sourceAssetId={sourceAssetId} onPreview={parse} />}
       {tab === 'file' && <><button data-role="secondary" onClick={() => fileInput.current?.click()}>{t('acquire.chooseFile')}</button><input ref={fileInput} hidden type="file" accept=".ttml,.xml,.txt,.lrc,.elrc,.eslrc,.qrc,.krc,.yrc,.lys,.sug" onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void open(file); }} /></>}
       {tab === 'text' && <><label>{t('acquire.textFormat')}<Select value={format} onChange={e => { setFormat(e.target.value as typeof format); setIncoming(null); }}>{['txt','ttml','lrc','elrc','eslrc','qrc','krc','yrc','lys','sug'].map(id => <option key={id}>{id}</option>)}</Select></label><textarea aria-label={t('acquire.textInput')} value={text} onChange={e => { setText(e.target.value); setIncoming(null); }} /><button data-role="secondary" onClick={() => parse(text, format)}>{t('acquire.previewText')}</button></>}
       {message && <p role="status">{message}</p>}

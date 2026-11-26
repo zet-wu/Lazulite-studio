@@ -1,3 +1,5 @@
+import { isBrowserRuntime } from '../adapters/runtime';
+import { BrowserAudioEntry } from './BrowserAudioEntry';
 import type { AlignmentScope } from './AudioReviewContext';
 import { preferences } from '../adapters/preferences';
 import { alignmentDefaults, resolveDefaultModel } from '../adapters/studio-preferences';
@@ -45,7 +47,7 @@ type PendingRun = {
 
 const ACTIVE_STATUSES = new Set(['queued', 'running', 'cancel_requested']);
 
-export function AlignmentPanel({
+function FullAlignmentPanel({
   pid,
   assetId,
   durationMs,
@@ -610,3 +612,7 @@ export function AlignmentPanel({
 }
 
 const t = i18n.t.bind(i18n);
+
+export function AlignmentPanel(props: Parameters<typeof FullAlignmentPanel>[0]) {
+  return isBrowserRuntime ? <BrowserAudioEntry kind="alignment" visible={props.visible} /> : <FullAlignmentPanel {...props} />;
+}

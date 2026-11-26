@@ -1,3 +1,5 @@
+import { isBrowserRuntime } from '../adapters/runtime';
+import { DesktopOnlyNotice } from '../shared/DesktopOnlyNotice';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -19,7 +21,7 @@ import styles from './acquisition.module.css';
 
 type PackagingLrcKind = 'none' | 'lrc' | 'elrc';
 
-export function MusicPackaging({
+function FullMusicPackaging({
   projectId,
   document,
   saveForPackaging,
@@ -229,4 +231,8 @@ export function MusicPackaging({
       {error && <p role="alert">{error}</p>}
     </div>
   );
+}
+
+export function MusicPackaging(props: Parameters<typeof FullMusicPackaging>[0]) {
+  return isBrowserRuntime ? <DesktopOnlyNotice /> : <FullMusicPackaging {...props} />;
 }

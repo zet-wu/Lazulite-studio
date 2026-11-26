@@ -1,3 +1,5 @@
+import { isBrowserRuntime } from '../adapters/runtime';
+import { BrowserAudioEntry } from './BrowserAudioEntry';
 import {VocalUpload} from './VocalUpload';
 import { message as describeMessage, MessageError, errorMessage, type Message } from '../domain/messages';
 import { deviceSummary, taskError } from './task-messages';
@@ -19,7 +21,7 @@ import { useAudioReview } from './AudioReviewContext';
 import { TopMenu } from './editor/TopMenu';
 import editorStyles from './editor/semantic-editor.module.css';
 import styles from './vocal.module.css';
-export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, save, durationMs, visible }: { locked?: boolean; projectId: string; project: ProjectDocument; sourceAssetId: string; apply: (command: ProjectCommand) => void; save?: () => Promise<unknown>; durationMs: number | null; visible: boolean }) {
+function FullVocalPanel({ locked, projectId, project, sourceAssetId, apply, save, durationMs, visible }: { locked?: boolean; projectId: string; project: ProjectDocument; sourceAssetId: string; apply: (command: ProjectCommand) => void; save?: () => Promise<unknown>; durationMs: number | null; visible: boolean }) {
   useTranslation();
   const ui = useAudioReview();
   const queryClient = useQueryClient();
@@ -170,3 +172,7 @@ export function VocalPanel({ locked, projectId, project, sourceAssetId, apply, s
 }
 
 const t=i18n.t.bind(i18n);
+
+export function VocalPanel(props: Parameters<typeof FullVocalPanel>[0]) {
+  return isBrowserRuntime ? <BrowserAudioEntry kind="vocal" visible={props.visible} /> : <FullVocalPanel {...props} />;
+}
