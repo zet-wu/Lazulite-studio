@@ -2,6 +2,7 @@ import { displayLines } from '../../../frontend/src/domain/amll-compatibility';
 import { parseProject } from '../../../frontend/src/adapters/project-codec';
 import { toRomaji } from 'wanakana';
 import { lineText } from '../../../frontend/src/domain/lyric-document';
+import { timeEnvelope } from '../../../frontend/src/domain/lyric-commands';
 import { id, invalid, requireLine } from './editing';
 import { z } from 'zod';
 import { localAlignmentTargets, mergeAlignment, type AlignmentResult } from '../../../frontend/src/domain/alignment';
@@ -41,12 +42,9 @@ async function resolveScope(client: import('../client').StudioClient, projectId:
   const kind = args.scope_line_ids ? 'lines' : 'words';
   const known = args.scope_ids ? leaves : kind === 'lines' ? ordered : words.map(item => item.word);
   if (new Set(ids).size !== ids.length || ids.some(id => !known.some(item => item.id === id))) invalid('Selection contains duplicate or unknown IDs.');
-  const scope = args.scope_ids ? (() => {
-    const selected = leaves.filter(unit => ids.includes(unit.id));
-    const begins = selected.flatMap(unit => unit.beginMs === null ? [] : [unit.beginMs]);
-    const ends = selected.flatMap(unit => unit.endMs === null ? [] : [unit.endMs]);
-    return {ids, envelopeIds:null, beginMs:begins.length ? Math.min(...begins) : null, endMs:ends.length ? Math.max(...ends) : null};
-  })() : localAlignmentTargets(doc.lyrics,kind,ids);
+  const scope = args.scope_ids
+    ? { ids, envelopeIds: null, ...timeEnvelope(leaves.filter(unit => ids.includes(unit.id))) }
+    : localAlignmentTargets(doc.lyrics, kind, ids);
   if (scope.ids.length < 2) invalid('Local alignment requires at least two reading leaves.');
   if (scope.beginMs === null || scope.endMs === null || scope.beginMs >= scope.endMs) invalid('Selected units have no valid time envelope; set row/word timing first.');
   const warnings: string[] = [];
