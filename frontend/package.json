@@ -45,6 +45,7 @@
     "@types/react-dom": "19.1.7",
     "@vitejs/plugin-react": "5.0.2",
     "cross-env": "10.0.0",
+    "fake-indexeddb": "6.2.4",
     "jsdom": "26.1.0",
     "msw": "2.11.1",
     "openapi-typescript": "7.9.1",

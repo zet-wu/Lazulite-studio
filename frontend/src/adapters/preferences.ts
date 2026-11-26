@@ -1,10 +1,11 @@
 import {message, MessageError, errorMessage} from '../domain/messages';
 import { requestHeaders } from './http/client';
+import { isBrowserRuntime } from './runtime';
 
 type Preferences = { version: number; revision: number; library_id: string; values: Record<string, string> };
 let current: Preferences | null = null;
 let pending = Promise.resolve();
-export const libraryIdentity = () => current?.library_id ?? 'legacy';
+export const libraryIdentity = () => isBrowserRuntime ? 'browser-v1' : current?.library_id ?? 'legacy';
 export const scopedSessionKey = (key: string) => `${libraryIdentity()}:${key}`;
 
 async function read(): Promise<Preferences> {
@@ -18,6 +19,7 @@ async function patch(snapshot: Preferences, changes: Record<string, string | nul
   return fetch('/api/v1/settings', { method: 'PATCH', headers: requestHeaders({ 'Content-Type': 'application/json', 'If-Match': `"${snapshot.revision}"` }), body: JSON.stringify({ changes }) });
 }
 export async function loadPreferences() {
+  if (isBrowserRuntime) return { version: 1, revision: 0, library_id: 'browser-v1', values: {} };
   const value = await read();
   current = value;
   return value;
@@ -66,6 +68,7 @@ export function savePreference(key: string, value: string | null): Promise<void>
 
 /** Uses the same library revision protocol; initialization never overwrites a winner. */
 export async function ensureLibraryPreference(key:string, detected:string):Promise<string> {
+  if(isBrowserRuntime) { const saved=localStorage.getItem(key);if(saved!==null)return saved;localStorage.setItem(key,detected);return detected; }
   if(current?.values[key]!==undefined)return current.values[key];
   for(let attempt=0;attempt<4;attempt++) {
     const latest=await read();current=latest;
@@ -78,6 +81,7 @@ export async function ensureLibraryPreference(key:string, detected:string):Promi
   throw new MessageError(message('preferences.initConflict'));
 }
 export function writeLibraryPreference(key:string,value:string):Promise<void> {
+  if(isBrowserRuntime)return savePreference(key,value);
   const operation=pending.then(async()=>{
     for(let attempt=0;attempt<4;attempt++) {
       const latest=await read();

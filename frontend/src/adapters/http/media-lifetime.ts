@@ -1,7 +1,9 @@
 import { apiFetch } from './client';
+import { isBrowserRuntime } from '../runtime';
 
 /** A page retains its project's decoded media across pause and focus changes. */
 export function retainProjectMedia(projectId: string, onError: (error: unknown) => void) {
+  if (isBrowserRuntime) return () => {};
   let pageId = crypto.randomUUID();
   let active = true;
   const send = (method: 'PUT' | 'DELETE') =>

@@ -1,3 +1,5 @@
+import { isBrowserRuntime } from '../runtime';
+
 export type ProjectRevisionEvent = {
   type: 'revision_changed';
   project_id: string;
@@ -31,6 +33,7 @@ export function subscribeProjectEvents(projectId: string, handlers: ProjectEvent
   let attempt = 0;
 
   const connect = () => {
+    if (isBrowserRuntime) return;
     if (closed || typeof EventSource === 'undefined') return;
     source?.close();
     source = new EventSource(`/api/v1/projects/${encodeURIComponent(projectId)}/events`, {
@@ -69,6 +72,10 @@ export function subscribeProjectEvents(projectId: string, handlers: ProjectEvent
   };
 
   connect();
+  const local = isBrowserRuntime ? new BroadcastChannel('studio-browser-revisions') : null;
+  if (local) local.onmessage = (event: MessageEvent<ProjectRevisionEvent>) => {
+    if (event.data.project_id === projectId) handlers.onRevisionChanged?.(event.data);
+  };
 
   const handleFocus = () => {
     if (!closed) handlers.onResync?.();
@@ -83,6 +90,7 @@ export function subscribeProjectEvents(projectId: string, handlers: ProjectEvent
     closed = true;
     if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
     source?.close();
+    local?.close();
     window.removeEventListener('focus', handleFocus);
     document.removeEventListener('visibilitychange', handleVisibility);
   };

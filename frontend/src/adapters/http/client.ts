@@ -1,4 +1,6 @@
 import { MessageError, message } from '../../domain/messages';
+import { isBrowserRuntime } from '../runtime';
+import { browserApi } from '../browser/client';
 import type { ProjectSnapshot } from '../../domain/project-document';
 import type { components } from "./generated";
 import {
@@ -31,6 +33,7 @@ export const requestHeaders = (extra: HeadersInit = {}) => ({
 });
 
 export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  if (isBrowserRuntime) throw new MessageError(message('demo.desktopOnly'));
   const response = await fetch(`${API_ROOT}${path}`, {
     credentials: "include",
     ...init,
@@ -165,7 +168,7 @@ export function isRejectedDocument(error: unknown): boolean {
   ].includes(error.body.code);
 }
 
-export const studioApi = {
+const httpStudioApi = {
   projectStorage: (id:string) => request(`/projects/${encodeURIComponent(id)}/storage`, (value:unknown): value is components['schemas']['ProjectStorage'] => {
     const v=value as components['schemas']['ProjectStorage'];
     return !!v && typeof v === 'object' && Number.isSafeInteger(v.total_bytes) && v.total_bytes>=0 && typeof v.measured_at==='string' && !!v.categories && typeof v.categories === 'object';
@@ -246,6 +249,8 @@ export const studioApi = {
     return { revision: result.revision, etag: `"${result.revision}"` };
   },
 };
+
+export const studioApi = isBrowserRuntime ? { ...httpStudioApi, ...browserApi } : httpStudioApi;
 
 export type JobResult = components["schemas"]["JobResult"];
 export type VocalResult = components['schemas']['VocalResult'];

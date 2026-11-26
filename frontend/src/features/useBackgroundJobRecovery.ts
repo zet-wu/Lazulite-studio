@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { isBrowserRuntime } from '../adapters/runtime';
 import { alignmentApi } from '../adapters/http/alignment';
 import { vocalApi } from '../adapters/http/client';
 import { jobsApi, type Job } from '../adapters/http/jobs';
@@ -123,7 +124,7 @@ export function useBackgroundJobRecovery({
   const alignmentResultQuery = useQuery({
     queryKey: ['recovery-alignment-result', latestAlignment?.id],
     queryFn: () => alignmentApi.result(latestAlignment!.id),
-    enabled: alignmentNeedsRecovery,
+    enabled: !isBrowserRuntime && alignmentNeedsRecovery,
   });
 
   const alignmentPrompt = useMemo<BackgroundAlignmentPrompt | null>(() => {
@@ -237,12 +238,12 @@ export function useBackgroundJobRecovery({
   const vocalJobResultQuery = useQuery({
     queryKey: ['recovery-vocal-result', latestVocal?.id],
     queryFn: () => vocalApi.jobResult(latestVocal!.id),
-    enabled: vocalNeedsRecovery,
+    enabled: !isBrowserRuntime && vocalNeedsRecovery,
   });
   const vocalsListQuery = useQuery({
     queryKey: ['vocals', projectId],
     queryFn: () => vocalApi.list(projectId),
-    enabled: vocalNeedsRecovery,
+    enabled: !isBrowserRuntime && vocalNeedsRecovery,
   });
 
   const [dismissedVocalIds, setDismissedVocalIds] = useState<string[]>([]);
