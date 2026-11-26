@@ -71,3 +71,14 @@ it('aborts a cancelled creation without leaving a project or binding its staged 
   await browserStore.discard('staged');
   expect(await browserStore.asset('staged')).toBeUndefined();
 });
+
+it('reports disabled IndexedDB clearly and allows a later retry', async () => {
+  const factory = new IDBFactory();
+  const open = vi.spyOn(factory, 'open').mockImplementationOnce(() => { throw new DOMException('Storage blocked', 'SecurityError'); });
+  vi.stubGlobal('indexedDB', factory);
+  const { browserStore } = await import('./db');
+  await expect(browserStore.list()).rejects.toMatchObject({ detail: { key: 'demo.storageUnavailable' } });
+  open.mockRestore();
+  await browserStore.create('retry', null, 'p1');
+  expect(await browserStore.list()).toHaveLength(1);
+});

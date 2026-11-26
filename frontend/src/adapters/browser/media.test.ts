@@ -75,3 +75,12 @@ it('discards an in-flight decode when another project becomes active', async () 
   expect(getAudioObjectUrl('p2')).toBe('blob:first');
   expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
 });
+
+it('settles cancellation before a slow decode completes', async () => {
+  const { decodeLocalAudio } = await import('./media');
+  const controller = new AbortController();
+  const loading = decodeLocalAudio({ arrayBuffer: () => new Promise<ArrayBuffer>(() => {}) } as Blob, controller.signal);
+  const assertion = expect(loading).rejects.toMatchObject({ name: 'AbortError' });
+  controller.abort();
+  await assertion;
+});

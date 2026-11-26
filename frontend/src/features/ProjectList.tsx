@@ -2,12 +2,12 @@ import { isBrowserRuntime } from '../adapters/runtime';
 import { DesktopDownloadLink, DesktopOnlyDialog } from '../shared/DesktopOnlyNotice';
 import { errorMessage, message } from '../domain/messages';
 import { useMessageText } from '../shared/useMessageText';
-import { i18n, formatDate } from '../i18n';
+import { i18n, formatDate, formatMessage } from '../i18n';
 import { useTranslation } from 'react-i18next';
 import { IconButton } from '../shared/Controls';
 import { Select } from '../shared/Select';
 import { useQuery } from "@tanstack/react-query";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useMemo, useRef, useState } from "react";
 import { studioApi } from "../adapters/http/client";
 import { clearProjectLocalData, announceProjectDeleted } from "../adapters/project-lifecycle";
@@ -17,9 +17,12 @@ import styles from "./workspace.module.css";
 
 export function ProjectList() {
   useTranslation();
+  const navigate = useNavigate();
+  const onCreated = (id: string) => isBrowserRuntime ? navigate(`/projects/${id}/edit`) : window.location.assign(`/projects/${id}/edit`);
   const query = useQuery({
     queryKey: ["projects"],
     queryFn: () => studioApi.listProjects(),
+    ...(isBrowserRuntime ? { refetchOnMount: 'always' as const } : {}),
   });
   const [desktopOnly, setDesktopOnly] = useState(false);
   const archiveNotice = desktopOnly && <DesktopOnlyDialog close={() => setDesktopOnly(false)}/>;
@@ -85,7 +88,7 @@ export function ProjectList() {
     return (
       <main className={styles.centerState}>
         <strong>{t('projects.unavailable')}</strong>
-        <p className={styles.muted}>{t('projects.failedHelp')}</p>
+        <p className={styles.muted}>{isBrowserRuntime ? formatMessage(errorMessage(query.error)) : t('projects.failedHelp')}</p>
         <button data-role="secondary" className={styles.primary} onClick={() => query.refetch()}>
           {t('common.retry')}</button>
       </main>
@@ -100,7 +103,7 @@ export function ProjectList() {
         {archiveError && <p role="alert">{archiveError}</p>}
         {!isBrowserRuntime && <p className={styles.muted}>{t('projects.emptyHelp')}</p>}
         <CreateProject
-          onCreated={(id) => window.location.assign(`/projects/${id}/edit`)}
+          onCreated={onCreated}
         />
       </main>
     );
@@ -115,7 +118,7 @@ export function ProjectList() {
           {importControl}
 
           <CreateProject
-            onCreated={(id) => window.location.assign(`/projects/${id}/edit`)}
+            onCreated={onCreated}
           />
         </div>
       </div>

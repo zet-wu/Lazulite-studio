@@ -11,7 +11,8 @@ const sessionAudio = new Map<string, Blob>();
 let connection: Promise<IDBDatabase> | undefined;
 
 function openDatabase(): Promise<IDBDatabase> {
-  return connection ??= new Promise((resolve, reject) => {
+  if (connection) return connection;
+  const attempt = new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(browserDatabaseName, 1);
     request.onupgradeneeded = () => {
       const db = request.result;
@@ -24,8 +25,10 @@ function openDatabase(): Promise<IDBDatabase> {
       db.onversionchange = () => { db.close(); connection = undefined; };
       resolve(db);
     };
-    request.onerror = () => { connection = undefined; reject(new MessageError(message('demo.storageUnavailable'))); };
+    request.onerror = () => reject(request.error);
   });
+  connection = attempt.catch(() => { connection = undefined; throw new MessageError(message('demo.storageUnavailable')); });
+  return connection;
 }
 const result = <T>(request: IDBRequest<T>) => new Promise<T>((resolve, reject) => {
   request.onsuccess = () => resolve(request.result);

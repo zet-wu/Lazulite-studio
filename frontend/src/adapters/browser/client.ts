@@ -6,10 +6,16 @@ export const browserApi = {
   getSession: async (): Promise<Session> => ({ schema_version: 'studio-session-v1', authenticated: true, mode: 'local', user: null, library_id: 'browser-v1' }),
   getCapabilities: async (): Promise<Capabilities> => ({ schema_version: 'studio-capabilities-v1', items: [] }),
   listProjects: async (_cursor?: string) => ({ schema_version: 'studio-project-list-v1' as const, items: await browserStore.list(), next_cursor: null }),
-  getProject: async (id: string) => {
+  getProject: async (id: string, signal?: AbortSignal) => {
     const project = await browserStore.project(id);
-    await prepareProjectMedia(id, project.asset?.id ?? null);
-    return project;
+    signal?.throwIfAborted();
+    const cancel = () => releaseProjectMedia(id);
+    signal?.addEventListener('abort', cancel, { once: true });
+    try {
+      await prepareProjectMedia(id, project.asset?.id ?? null);
+      signal?.throwIfAborted();
+      return project;
+    } finally { signal?.removeEventListener('abort', cancel); }
   },
   createProject: (name: string, uploadId: string | null, key: string, signal?: AbortSignal, _sourceFilename?: string) => browserStore.create(name, uploadId, key, signal),
   deleteProject: async (id: string) => { const deleted = await browserStore.delete(id); releaseProjectMedia(id); return deleted; },

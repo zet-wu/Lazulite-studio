@@ -215,8 +215,8 @@ const httpStudioApi = {
       `/projects${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
       isProjectList,
     ),
-  getProject: (projectId: string) =>
-    request(`/projects/${encodeURIComponent(projectId)}`, isProjectSummary),
+  getProject: (projectId: string, signal?: AbortSignal) =>
+    request(`/projects/${encodeURIComponent(projectId)}`, isProjectSummary, signal),
   getWaveform: (
     projectId: string,
     startMs = 0,
