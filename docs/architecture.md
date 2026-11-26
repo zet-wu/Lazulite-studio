@@ -1,6 +1,6 @@
 # Lazulite Studio 项目架构
 
-Lazulite Studio 由浏览器前端与同源本地/服务端 API 组成，面向 Windows / macOS 桌面浏览器的鼠标与键盘操作。前端基于 React 19、TypeScript 与 Vite；后端基于 FastAPI、SQLite 与本地文件系统，并内置 [Lazulite](https://github.com/wuchenyanmo/Lazulite) 承担人声分离与自动对齐计算。
+Lazulite Studio 由浏览器前端与同源本地/服务端 API 组成，面向 Windows / macOS 桌面浏览器的鼠标与键盘操作。前端基于 React 19、TypeScript 与 Vite；浏览器 Demo 通过独立构建使用 IndexedDB／localStorage 保存项目和偏好，以浏览器媒体引擎运行本地编辑与导出。完整版后端基于 FastAPI、SQLite 与本地文件系统，并内置 [Lazulite](https://github.com/wuchenyanmo/Lazulite) 承担人声分离与自动对齐计算。
 
 ## 目录与模块职责
 
@@ -9,7 +9,7 @@ Lazulite Studio 由浏览器前端与同源本地/服务端 API 组成，面向 
 | `frontend/src/app` | 路由、登录会话、Query Provider、错误边界与常驻顶栏 |
 | `frontend/src/features` | 项目工作区、编辑画布、声谱图/时间轴、打轴、卡拉 OK、获取与打包界面 |
 | `frontend/src/domain` | 项目与歌词数据结构、纯编辑命令、时间轴投影、注音与卡拉 OK 领域规则 |
-| `frontend/src/adapters` | TTML / LRC / ASS / NicoKara / SUG 格式读写、HTTP 通信与 IndexedDB 恢复 |
+| `frontend/src/adapters` | TTML / LRC / ASS / NicoKara / SUG 格式读写、HTTP／浏览器适配与 IndexedDB 持久化 |
 | `frontend/src/shared` | 主题 token、图标、按钮/表单/弹窗/右键菜单等通用控件 |
 | `server` | 项目与修订持久化、项目事件 SSE 流、音频代理、读音/词典/字形接口、模型任务与媒体打包 |
 | `mcp` | 基于共享领域层与后端 HTTP API 的语义工具集与 MCP Server（支持 `stdio` 与回环 Streamable HTTP） |
