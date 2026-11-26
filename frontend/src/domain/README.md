@@ -5,10 +5,11 @@
 ## 歌词编辑与结构命令
 
 - `lyric-commands.ts`、`line-structure.ts`、`selection-editing.ts`：负责增删改、拆行、合行、合词、合注音、复制、字形替换、歌手管理与附属内容编辑，所有复合操作以单次原子事务提交并自动维护引用一致性。
-- `segmentation.ts`、`batch-editing.ts`、`translation-editing.ts`：提供按原文边界分词、时间偏移、消除相邻词间空隙、批处理替换、清除注音/导唱符与翻译/音译轨道归轨。
+- `segmentation.ts`、`batch-editing.ts`、`translation-editing.ts`：提供按原文边界分词、时间偏移、按行内读音叶子流消除短空隙／重叠（可包含非中日韩读音）、批处理替换、清除注音/导唱符与翻译/音译轨道归轨。
 
 ## 打轴、时间轴与声学
 
+- `reading-units.ts`：将行内有注音的词展开为注音叶子，其他词作为正文叶子；批处理与时间轴空隙闭合共用中点规则，更新父词注音包络并包含于父行。
 - `sync-editing.ts`：从有效选区派生连续/本行打轴游标，处理 SUG／AMLL 检查点、词内节奏点／空拍、终止点及忽略打轴行。
 - `timeline-editing.ts`、`timeline-projection.ts`、`pack-intervals.ts`、`active-lines.ts`：负责时间端点拖动、同行贴合叶子单元的原子边界联动及重合首尾注音保护、缩放吸附、单端未定对象的显示投影、分轨排布与播放头活动行快速查找。`WeakMap` 缓存与线性索引避免长文档上的重复扫描。
 - `spectrogram.ts`：预计算 1024 点 FFT 旋转因子、Hann 窗与对数频率映射表，以相邻频率 bin 幅值插值生成512×256强度瓦片；不足4秒的末片沿用固定时间采样网格，由渲染端裁掉未使用尾部。
