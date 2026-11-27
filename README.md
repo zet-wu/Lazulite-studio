@@ -3,7 +3,9 @@
 </p>
 <h1 align="center">Lazulite Studio</h1>
 <p align="center">
-  基于 TTML 歌词格式的打轴工具，集丰富的歌词编辑能力、精确打轴、自动化工具为一体。
+  基于 TTML 歌词格式的打轴工具，集丰富的歌词编辑能力、精确打轴、自动化工具为一体。<br>
+  项目介绍网页：https://lazulite.uzewt.de/<br>
+  在线轻量化 demo 体验：https://demo.lazulite.uzewt.de/<br>
 </p>
 
 ---
