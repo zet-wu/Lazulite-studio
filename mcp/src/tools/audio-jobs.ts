@@ -61,8 +61,10 @@ async function fetchVisualEnergy(
   if (source !== 'vocal') return { data: null, vocal_result_id: null, reason: 'source_is_original' };
   if (!resultId || resultStatus !== 'ready') return { data: null, vocal_result_id: resultId ?? null, reason: 'vocal_analysis_not_ready' };
   if (actual[1] <= actual[0]) return { data: null, vocal_result_id: resultId, reason: 'empty_window' };
+  const startMs = Math.max(0, Math.floor(actual[0]));
+  const endMs = Math.max(startMs + 1, Math.ceil(actual[1]));
   const data = await client.json<EnergyWindow>(
-    `${projectPath(projectId)}/vocals/${encodeURIComponent(resultId)}/energy?${new URLSearchParams({ start_ms: String(actual[0]), end_ms: String(actual[1]), buckets: String(VISUAL_PLOT_WIDTH) })}`,
+    `${projectPath(projectId)}/vocals/${encodeURIComponent(resultId)}/energy?${new URLSearchParams({ start_ms: String(startMs), end_ms: String(endMs), buckets: String(VISUAL_PLOT_WIDTH) })}`,
   );
   return { data, vocal_result_id: resultId, reason: null };
 }

@@ -30,7 +30,7 @@ function decodePngPixels(bytes:Buffer){
  }
  return {width,height,pixels};
 }
-function fixture(audio=wav(),options:{short?:boolean;vocalStatus?:string;jobs?:Record<string,{job:Record<string,unknown>;result?:Record<string,unknown>}>}={}){
+function fixture(audio=wav(),options:{short?:boolean;vocalStatus?:string;actualRange?:[number,number];jobs?:Record<string,{job:Record<string,unknown>;result?:Record<string,unknown>}>}={}){
  const doc=createProjectDocument();doc.lyrics.lines=[{...createLine('','l'),beginMs:1000,endMs:options.short?2000:20000,words:[{...createWord('愛','w'),beginMs:1000,endMs:1800,rubyUnits:[{id:'r1',reading:'あ',beginMs:1000,endMs:1400},{id:'r2',reading:'い',beginMs:1420,endMs:1800}]},{...createWord('love','western'),beginMs:1800,endMs:2000}]}];
  doc.acoustics={analysisId:'selected',segments:[{id:'s',beginMs:900,endMs:1900}]};
  const urls:URL[]=[];
@@ -39,10 +39,18 @@ function fixture(audio=wav(),options:{short?:boolean;vocalStatus?:string;jobs?:R
   if(url.pathname==='/api/v1/projects/p')return Response.json({asset:{id:'asset',source_duration_ms:30000,duration_ms:30000}});
   if(url.pathname.endsWith('/vocals'))return Response.json({items:['other','selected'].map(id=>({id,source_asset_id:'asset',audio_state:'current',status:options.vocalStatus??'ready',duration_ms:25000}))});
   if(url.pathname.endsWith('/energy')){
-   const start=Number(url.searchParams.get('start_ms')??0);
+   const rawStart=url.searchParams.get('start_ms')??'',rawEnd=url.searchParams.get('end_ms')??'';
+   if(!/^\d+$/.test(rawStart)||!/^\d+$/.test(rawEnd)||Number(rawEnd)<=Number(rawStart)){
+    return Response.json({detail:'int_parsing'},{status:422});
+   }
+   const start=Number(rawStart);
    return Response.json({start_ms:start,step_ms:25,values:Array.from({length:40},(_,i)=>i<8?0.02:i<24?0.45:0.15)});
   }
-  if(url.pathname.endsWith('/audio-excerpt'))return new Response(audio,{headers:{'X-Actual-Start-Ms':url.searchParams.get('start_ms')!,'X-Actual-End-Ms':String(Number(url.searchParams.get('start_ms'))+Math.max(0,(audio.length-44)/32))}});
+  if(url.pathname.endsWith('/audio-excerpt')){
+   const actualStart=options.actualRange?options.actualRange[0]:Number(url.searchParams.get('start_ms'));
+   const actualEnd=options.actualRange?options.actualRange[1]:actualStart+Math.max(0,(audio.length-44)/32);
+   return new Response(audio,{headers:{'X-Actual-Start-Ms':String(actualStart),'X-Actual-End-Ms':String(actualEnd)}});
+  }
   const jobMatch=url.pathname.match(/^\/api\/v1\/jobs\/([^/]+)(\/result)?$/);
   if(jobMatch&&options.jobs?.[jobMatch[1]]){
    const entry=options.jobs[jobMatch[1]];
@@ -261,4 +269,25 @@ it('rejects stale revision, duplicate, non-alignment, unfinished or mismatched-s
  await expect(registry.call('compare_alignment_results',{project_id:'p',job_ids:['r'],start_ms:1000,end_ms:2000},running)).rejects.toMatchObject({status:409,body:{code:'result_not_ready'}});
  const wrongAsset=fixture(wav(),{jobs:{w:alignmentJob('w',{assetId:'other-asset'})}});
  await expect(registry.call('compare_alignment_results',{project_id:'p',job_ids:['w'],start_ms:1000,end_ms:2000},wrongAsset)).rejects.toMatchObject({status:409,body:{code:'source_asset_changed'}});
+});
+
+it('brackets fractional decoded excerpt bounds into integer energy queries while preserving exact actual_range_ms',async()=>{
+ const actualRange:[number,number]=[1000.9977324263,1999.0022675737];
+ const jobA=alignmentJob('jobA',{timings:{r1:{begin:1000,end:1380},r2:{begin:1410,end:1800},western:{begin:1800,end:2000}}});
+ const f=fixture(wav(),{actualRange,jobs:{jobA}}),registry=createToolRegistry();
+
+ const visual=await registry.call('get_timeline_visual',{project_id:'p',start_ms:1001,end_ms:1999},f) as McpToolPayload;
+ const visualMeta=JSON.parse((visual.content[0] as {type:'text';text:string}).text);
+ expect(visualMeta).toMatchObject({actual_range_ms:actualRange,image_size:[840,330],energy:{included:true,vocal_result_id:'selected'}});
+
+ const compare=await registry.call('compare_alignment_results',{project_id:'p',job_ids:['jobA'],start_ms:1001,end_ms:1999},f) as McpToolPayload;
+ const compareMeta=JSON.parse((compare.content[0] as {type:'text';text:string}).text);
+ expect(compareMeta).toMatchObject({actual_range_ms:actualRange,energy:{included:true,vocal_result_id:'selected'}});
+
+ const energyUrls=f.urls.filter(u=>u.pathname.endsWith('/energy'));
+ expect(energyUrls).toHaveLength(2);
+ for(const url of energyUrls){
+  expect(url.searchParams.get('start_ms')).toBe('1000');
+  expect(url.searchParams.get('end_ms')).toBe('2000');
+ }
 });
